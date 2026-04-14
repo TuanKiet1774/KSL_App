@@ -4,6 +4,7 @@ import 'package:ksl/component/navigation.dart';
 import 'package:ksl/view/favorite.dart';
 import 'package:ksl/view/translate.dart';
 import 'package:ksl/view/settings.dart';
+import 'package:ksl/view/infomation.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -64,11 +65,11 @@ class HomeMainContent extends StatelessWidget {
   String getGreeting() {
     var hour = DateTime.now().hour;
     if (hour < 12) {
-      return 'Chào buổi sáng';
+      return 'Buổi sáng vui vẻ';
     } else if (hour < 18) {
-      return 'Chào buổi trưa';
+      return 'Buổi trưa vui vẻ';
     } else {
-      return 'Chào buổi tối';
+      return 'Buổi tối vui vẻ';
     }
   }
 
@@ -167,7 +168,12 @@ class HomeMainContent extends StatelessWidget {
                         ),
                         const SizedBox(height: 20),
                         ElevatedButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const InformationView()),
+                            );
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.accentOrange,
                             foregroundColor: Colors.white,
