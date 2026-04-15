@@ -6,14 +6,14 @@ import 'package:ksl/view/translate.dart';
 import 'package:ksl/view/settings.dart';
 import 'package:ksl/view/infomation.dart';
 
-class HomeView extends StatefulWidget {
-  const HomeView({super.key});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
 
   @override
-  State<HomeView> createState() => _HomeViewState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _HomeViewState extends State<HomeView> {
+class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
   // Danh sách các trang tương ứng với Navigation

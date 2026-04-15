@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ksl/view/home.dart';
+import 'package:ksl/view/account/login.dart';
 import 'package:ksl/component/app_colors.dart';
 
 void main() {
@@ -19,7 +19,7 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: AppColors.backgroundCream,
         useMaterial3: true,
       ),
-      home: const HomeView(),
+      home: const LoginPage(),
     );
   }
 }

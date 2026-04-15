@@ -289,7 +289,7 @@ class _InformationViewState extends State<InformationView> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Hình 1: Geronimo Cardano',
+                        'Geronimo Cardano',
                         style: TextStyle(
                           fontSize: 14,
                           fontStyle: FontStyle.italic,
@@ -351,7 +351,7 @@ class _InformationViewState extends State<InformationView> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Hình 2: Juan Pablo de Bonet',
+                        'Juan Pablo de Bonet',
                         style: TextStyle(
                           fontSize: 14,
                           fontStyle: FontStyle.italic,
@@ -451,7 +451,7 @@ class _InformationViewState extends State<InformationView> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Hình 3: Abbe Charles Michel de L\'Epee',
+                        'Abbe Charles Michel de L\'Epee',
                         style: TextStyle(
                           fontSize: 14,
                           fontStyle: FontStyle.italic,
