@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ksl/component/app_colors.dart';
 import 'package:ksl/controller/auth_controller.dart';
 import 'package:ksl/view/home.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/view/account/register.dart';
+import 'package:ksl/component/confirmDialog.dart';
+import 'dart:io';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -78,9 +81,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         'Đăng nhập thành công!',
       );
 
-      Future.delayed(const Duration(seconds: 2), () {
+      Future.delayed(const Duration(milliseconds: 1500), () {
         if (mounted) {
-          Navigator.pop(context); // Đóng dialog
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const HomePage()),
@@ -99,52 +101,68 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundCream,
-      body: Stack(
-        children: [
-          // Background Decoration
-          Positioned(
-            top: -100,
-            left: -50,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primaryTeal.withOpacity(0.05),
+    return WillPopScope(
+      onWillPop: () async {
+        // Hiện modal và LUÔN LUÔN trả về false
+        ConfirmDialog.show(
+          context,
+          title: 'Xác nhận thoát',
+          message: 'Bạn có chắc chắn muốn thoát ứng dụng không?',
+          icon: Icons.exit_to_app_rounded,
+          color: AppColors.primaryTeal,
+          confirmText: 'Thoát',
+          cancelText: 'Hủy',
+          onConfirm: () => SystemNavigator.pop(),
+        );
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.backgroundCream,
+        body: Stack(
+          children: [
+            // Background Decoration
+            Positioned(
+              top: -100,
+              left: -50,
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primaryTeal.withOpacity(0.05),
+                ),
               ),
             ),
-          ),
-
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: SlideTransition(
-                    position: _slideAnimation,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildLogoCenter(),
-                        const SizedBox(height: 32),
-                        _buildHeader(),
-                        const SizedBox(height: 32),
-                        _buildLoginCard(),
-                        const SizedBox(height: 32),
-                        _buildRegisterLink(),
-                      ],
+            
+            SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SlideTransition(
+                      position: _slideAnimation,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildLogoCenter(),
+                          const SizedBox(height: 32),
+                          _buildHeader(),
+                          const SizedBox(height: 32),
+                          _buildLoginCard(),
+                          const SizedBox(height: 32),
+                          _buildRegisterLink(),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

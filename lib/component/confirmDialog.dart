@@ -1,9 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:ksl/component/app_colors.dart';
-import 'dart:io';
 
-class ExitDialog extends StatelessWidget {
-  const ExitDialog({super.key});
+class ConfirmDialog extends StatelessWidget {
+  final String title;
+  final String message;
+  final IconData icon;
+  final Color color;
+  final String confirmText;
+  final String cancelText;
+  final VoidCallback? onConfirm;
+
+  const ConfirmDialog({
+    super.key,
+    required this.title,
+    required this.message,
+    required this.icon,
+    required this.color,
+    this.confirmText = 'Xác nhận',
+    this.cancelText = 'Hủy',
+    this.onConfirm,
+  });
+
+  static void show(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required IconData icon,
+    Color color = AppColors.primaryTeal,
+    String confirmText = 'Xác nhận',
+    String cancelText = 'Hủy',
+    VoidCallback? onConfirm,
+  }) {
+    showDialog(
+      context: context,
+      useRootNavigator: true, // Đảm bảo dùng Navigator gốc của ứng dụng
+      barrierDismissible: false,
+      builder: (context) => ConfirmDialog(
+        title: title,
+        message: message,
+        icon: icon,
+        color: color,
+        confirmText: confirmText,
+        cancelText: cancelText,
+        onConfirm: onConfirm,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,19 +74,19 @@ class ExitDialog extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: color.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.exit_to_app_rounded,
-                color: Colors.red.shade600,
+                icon,
+                color: color,
                 size: 32,
               ),
             ),
             const SizedBox(height: 24),
-            const Text(
-              'Xác nhận thoát',
-              style: TextStyle(
+            Text(
+              title,
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
                 color: AppColors.primaryBlue,
@@ -52,7 +94,7 @@ class ExitDialog extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Bạn có chắc chắn muốn thoát ứng dụng không?',
+              message,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 15,
@@ -65,7 +107,7 @@ class ExitDialog extends StatelessWidget {
               children: [
                 Expanded(
                   child: TextButton(
-                    onPressed: () => Navigator.pop(context, false),
+                    onPressed: () => Navigator.pop(context),
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
@@ -74,7 +116,7 @@ class ExitDialog extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      'Hủy',
+                      cancelText,
                       style: TextStyle(
                         color: Colors.grey.shade700,
                         fontWeight: FontWeight.w700,
@@ -85,9 +127,14 @@ class ExitDialog extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => exit(0),
+                    onPressed: () {
+                      Navigator.pop(context); // Đóng modal trước
+                      if (onConfirm != null) {
+                        onConfirm!(); // Thực hiện hành động sau
+                      }
+                    },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade600,
+                      backgroundColor: color,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 14),
@@ -95,9 +142,9 @@ class ExitDialog extends StatelessWidget {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    child: const Text(
-                      'Thoát',
-                      style: TextStyle(
+                    child: Text(
+                      confirmText,
+                      style: const TextStyle(
                         fontWeight: FontWeight.w700,
                       ),
                     ),

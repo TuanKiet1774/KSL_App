@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ksl/component/app_colors.dart';
 import 'package:ksl/component/navigation.dart';
 import 'package:ksl/view/favorite.dart';
@@ -6,7 +8,7 @@ import 'package:ksl/view/translate.dart';
 import 'package:ksl/view/settings.dart';
 import 'package:ksl/view/infomation.dart';
 
-import 'package:ksl/component/exit_dialog.dart';
+import 'package:ksl/component/confirmDialog.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -18,7 +20,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
-  // Danh sách các trang tương ứng với Navigation
   final List<Widget> _pages = [
     const HomeMainContent(),
     const FavoriteView(),
@@ -30,11 +31,24 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        final bool shouldPop = await showDialog(
-          context: context,
-          builder: (context) => const ExitDialog(),
-        ) ?? false;
-        return shouldPop;
+        if (_selectedIndex != 0) {
+          setState(() => _selectedIndex = 0);
+          return false;
+        }
+
+        // Hiện modal ngay lập tức và luôn chặn phím Back bằng cách trả về false
+        ConfirmDialog.show(
+          context,
+          title: 'Xác nhận thoát',
+          message: 'Bạn có chắc chắn muốn thoát ứng dụng không?',
+          icon: Icons.exit_to_app_rounded,
+          color: AppColors.primaryTeal,
+          confirmText: 'Thoát',
+          cancelText: 'Hủy',
+          onConfirm: () => SystemNavigator.pop(),
+        );
+        
+        return false;
       },
       child: Scaffold(
       backgroundColor: AppColors.backgroundCream,

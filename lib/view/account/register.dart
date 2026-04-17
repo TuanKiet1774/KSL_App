@@ -131,13 +131,12 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
         'Đăng ký tài khoản thành công! Vui lòng đăng nhập.',
       );
 
-      // Đợi 2 giây sau đó tự động chuyển hướng
-      Future.delayed(const Duration(seconds: 2), () {
+      Future.delayed(const Duration(milliseconds: 1500), () {
         if (mounted) {
-          Navigator.pop(context); // Đóng dialog
-          Navigator.pushReplacement(
+          Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const LoginPage()),
+            (route) => false,
           );
         }
       });
@@ -152,56 +151,61 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundCream,
-      body: Stack(
-        children: [
-          // Background Decoration
-          Positioned(
-            top: -100,
-            right: -50,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primaryTeal.withOpacity(0.05),
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context);
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.backgroundCream,
+        body: Stack(
+          children: [
+            Positioned(
+              top: -100,
+              right: -50,
+              child: Container(
+                width: 300,
+                height: 300,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primaryTeal.withOpacity(0.05),
+                ),
               ),
             ),
-          ),
-          
-          SafeArea(
-            child: Column(
-              children: [
-                _buildAppBar(),
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: SlideTransition(
-                        position: _slideAnimation,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 10),
-                            _buildHeader(),
-                            const SizedBox(height: 32),
-                            _buildRegisterCard(),
-                            const SizedBox(height: 32),
-                            _buildLoginLink(),
-                            const SizedBox(height: 40),
-                          ],
+            
+            SafeArea(
+              child: Column(
+                children: [
+                  _buildAppBar(),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: SlideTransition(
+                          position: _slideAnimation,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 10),
+                              _buildHeader(),
+                              const SizedBox(height: 32),
+                              _buildRegisterCard(),
+                              const SizedBox(height: 32),
+                              _buildLoginLink(),
+                              const SizedBox(height: 40),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
