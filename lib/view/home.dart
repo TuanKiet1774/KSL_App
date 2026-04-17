@@ -9,6 +9,9 @@ import 'package:ksl/view/settings.dart';
 import 'package:ksl/view/infomation.dart';
 
 import 'package:ksl/component/confirmDialog.dart';
+import 'package:ksl/component/user_avatar.dart';
+import 'package:ksl/model/user.dart';
+import 'package:ksl/controller/auth_controller.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -18,17 +21,32 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  UserModel? _user;
   int _selectedIndex = 0;
 
-  final List<Widget> _pages = [
-    const HomeMainContent(),
-    const FavoriteView(),
-    const TranslateView(),
-    const SettingsView(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final user = await AuthController.getSavedUser();
+    if (mounted) {
+      setState(() {
+        _user = user;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final List<Widget> pages = [
+      HomeMainContent(user: _user),
+      const FavoriteView(),
+      const TranslateView(),
+      const SettingsView(),
+    ];
     return WillPopScope(
       onWillPop: () async {
         if (_selectedIndex != 0) {
@@ -76,14 +94,15 @@ class _HomePageState extends State<HomePage> {
             ),
           );
         },
-        child: _pages[_selectedIndex],
+        child: pages[_selectedIndex],
       ),
     ));
   }
 }
 
 class HomeMainContent extends StatelessWidget {
-  const HomeMainContent({super.key});
+  final UserModel? user;
+  const HomeMainContent({super.key, this.user});
 
   String getGreeting() {
     var hour = DateTime.now().hour;
@@ -114,7 +133,12 @@ class HomeMainContent extends StatelessWidget {
                     height: 50,
                     width: 50,
                     errorBuilder: (context, error, stackTrace) =>
-                        const Icon(Icons.blur_on, size: 50, color: AppColors.primaryTeal),
+                        UserAvatar(
+                          imageUrl: user?.avatar,
+                          fullname: user?.fullname ?? "K",
+                          radius: 25,
+                          fontSize: 16,
+                        ),
                   ),
                   const SizedBox(width: 15),
                   Column(

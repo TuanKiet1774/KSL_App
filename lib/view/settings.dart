@@ -4,6 +4,8 @@ import 'package:ksl/controller/auth_controller.dart';
 import 'package:ksl/model/user.dart';
 import 'package:ksl/view/account/login.dart';
 import 'package:ksl/component/confirmDialog.dart';
+import 'package:ksl/view/profile.dart';
+import 'package:ksl/component/user_avatar.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -84,15 +86,11 @@ class _SettingsViewState extends State<SettingsView> {
               shape: BoxShape.circle,
               border: Border.all(color: AppColors.primaryTeal.withOpacity(0.2), width: 2),
             ),
-            child: CircleAvatar(
+            child: UserAvatar(
+              imageUrl: _user?.avatar,
+              fullname: _user?.fullname ?? "K",
               radius: 60,
-              backgroundColor: Colors.white,
-              backgroundImage: (_user != null && _user!.avatar.isNotEmpty)
-                  ? NetworkImage(_user!.avatar)
-                  : null,
-              child: (_user == null || _user!.avatar.isEmpty)
-                  ? const Icon(Icons.person, size: 60, color: AppColors.primaryTeal)
-                  : null,
+              fontSize: 40,
             ),
           ),
           const SizedBox(height: 16),
@@ -157,7 +155,12 @@ class _SettingsViewState extends State<SettingsView> {
           _buildMenuItem(
             icon: Icons.person_outline_rounded,
             title: 'Thông tin cá nhân',
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
+              ).then((_) => _loadUserData()); // Làm mới dữ liệu khi quay lại
+            },
           ),
           _buildDivider(),
           _buildMenuItem(

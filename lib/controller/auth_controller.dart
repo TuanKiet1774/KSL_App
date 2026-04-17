@@ -118,6 +118,40 @@ class AuthController {
     return prefs.getString('access_token');
   }
 
+  /// Lấy thông tin chi tiết người dùng (Profile)
+  static Future<Map<String, dynamic>> getProfile() async {
+    try {
+      final token = await getAccessToken();
+      if (token == null) return {'success': false, 'message': 'Chưa đăng nhập'};
+
+      final response = await http.get(
+        Uri.parse('$urlAPI/api/auth/profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        final user = UserModel.fromJson(data['data']);
+        await _saveUserData(user); // Cập nhật dữ liệu mới nhất
+        return {'success': true, 'user': user};
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Không thể lấy thông tin cá nhân',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Lỗi kết nối: $e',
+      };
+    }
+  }
+
   /// Đăng xuất
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();

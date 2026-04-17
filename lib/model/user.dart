@@ -3,9 +3,13 @@ class UserModel {
   final String username;
   final String fullname;
   final String email;
+  final String phone;
   final String role;
   final String avatar;
+  final String birthday;
+  final String address;
   final String level;
+  final String gender;
   final int exp;
   final String accessToken;
   final String refreshToken;
@@ -15,9 +19,13 @@ class UserModel {
     required this.username,
     required this.fullname,
     required this.email,
+    required this.phone,
     required this.role,
     required this.avatar,
+    required this.birthday,
+    required this.address,
     required this.level,
+    required this.gender,
     required this.exp,
     required this.accessToken,
     required this.refreshToken,
@@ -29,12 +37,16 @@ class UserModel {
       username: json['username'] ?? '',
       fullname: json['fullname'] ?? '',
       email: json['email'] ?? '',
+      phone: json['phone'] ?? '',
       role: json['role'] ?? '',
       avatar: json['avatar'] ?? '',
+      birthday: json['birthday'] ?? '',
+      address: json['address'] ?? '',
       level: json['level'] ?? '',
+      gender: json['gender'] ?? '',
       exp: json['exp'] ?? 0,
-      accessToken: json['accessToken'] ?? '',
-      refreshToken: json['refreshToken'] ?? '',
+      accessToken: json['accessToken'] ?? json['mobileSessionToken'] ?? '',
+      refreshToken: json['refreshToken'] ?? json['mobileRefreshToken'] ?? '',
     );
   }
 
@@ -44,9 +56,13 @@ class UserModel {
       'username': username,
       'fullname': fullname,
       'email': email,
+      'phone': phone,
       'role': role,
       'avatar': avatar,
+      'birthday': birthday,
+      'address': address,
       'level': level,
+      'gender': gender,
       'exp': exp,
       'accessToken': accessToken,
       'refreshToken': refreshToken,
