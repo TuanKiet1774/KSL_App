@@ -6,6 +6,8 @@ import 'package:ksl/view/translate.dart';
 import 'package:ksl/view/settings.dart';
 import 'package:ksl/view/infomation.dart';
 
+import 'package:ksl/component/exit_dialog.dart';
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -26,7 +28,15 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: () async {
+        final bool shouldPop = await showDialog(
+          context: context,
+          builder: (context) => const ExitDialog(),
+        ) ?? false;
+        return shouldPop;
+      },
+      child: Scaffold(
       backgroundColor: AppColors.backgroundCream,
       bottomNavigationBar: KslNavigationBar(
         currentIndex: _selectedIndex,
@@ -54,11 +64,10 @@ class _HomePageState extends State<HomePage> {
         },
         child: _pages[_selectedIndex],
       ),
-    );
+    ));
   }
 }
 
-// Tách nội dung chính của trang chủ ra một Widget riêng
 class HomeMainContent extends StatelessWidget {
   const HomeMainContent({super.key});
 
@@ -118,7 +127,6 @@ class HomeMainContent extends StatelessWidget {
               ),
             ),
 
-            // Sign Language Image Section
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Stack(

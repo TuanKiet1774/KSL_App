@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ksl/connectDB/api.dart';
-import 'package:ksl/model/user_model.dart';
+import 'package:ksl/model/user.dart';
 
 class AuthController {
   /// Đăng nhập với username và password
@@ -30,6 +30,53 @@ class AuthController {
         return {
           'success': false,
           'message': data['message'] ?? 'Đăng nhập thất bại',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Không thể kết nối đến server. Vui lòng thử lại.',
+      };
+    }
+  }
+
+  /// Đăng ký tài khoản mới
+  static Future<Map<String, dynamic>> register({
+    required String username,
+    required String fullname,
+    required String email,
+    required String password,
+    String? phone,
+    String? gender,
+    String? birthday,
+    String? address,
+    String? level,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$urlAPI/api/auth/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'username': username,
+          'fullname': fullname,
+          'email': email,
+          'password': password,
+          'phone': phone,
+          'gender': gender,
+          'birthday': birthday,
+          'address': address,
+          'level': level,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 201 || (response.statusCode == 200 && data['success'] == true)) {
+        return {'success': true, 'message': data['message'] ?? 'Đăng ký thành công'};
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Đăng ký thất bại',
         };
       }
     } catch (e) {
