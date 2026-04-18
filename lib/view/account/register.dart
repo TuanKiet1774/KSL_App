@@ -455,44 +455,59 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
           ),
         ),
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _buildRadioTile("Nam"),
-            const SizedBox(width: 40),
-            _buildRadioTile("Nữ"),
+            Expanded(child: _buildGenderItem("Nam", Icons.male_rounded)),
+            const SizedBox(width: 16),
+            Expanded(child: _buildGenderItem("Nữ", Icons.female_rounded)),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildRadioTile(String value) {
+  Widget _buildGenderItem(String value, IconData icon) {
     bool isSelected = _selectedGender == value;
-    return InkWell(
+    return GestureDetector(
       onTap: () => setState(() => _selectedGender = value),
-      borderRadius: BorderRadius.circular(8),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Transform.scale(
-            scale: 0.9,
-            child: Radio<String>(
-              value: value,
-              groupValue: _selectedGender,
-              activeColor: AppColors.primaryTeal,
-              onChanged: (val) => setState(() => _selectedGender = val!),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : AppColors.backgroundCream.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? AppColors.primaryTeal : Colors.grey.shade100,
+            width: isSelected ? 2 : 1,
           ),
-          Text(
-            value,
-            style: TextStyle(
-              color: isSelected ? AppColors.primaryTeal : AppColors.primaryBlue.withOpacity(0.7),
-              fontSize: 15,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: AppColors.primaryTeal.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : [],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              color: isSelected ? AppColors.primaryTeal : Colors.grey.shade400,
+              size: 20,
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Text(
+              value,
+              style: TextStyle(
+                color: isSelected ? AppColors.primaryBlue : Colors.grey.shade600,
+                fontSize: 15,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

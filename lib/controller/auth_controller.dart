@@ -87,7 +87,6 @@ class AuthController {
     }
   }
 
-  /// Lưu dữ liệu người dùng vào SharedPreferences
   static Future<void> _saveUserData(UserModel user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user_data', jsonEncode(user.toJson()));
@@ -96,13 +95,11 @@ class AuthController {
     await prefs.setBool('is_logged_in', true);
   }
 
-  /// Kiểm tra trạng thái đăng nhập
   static Future<bool> isLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool('is_logged_in') ?? false;
   }
 
-  /// Lấy dữ liệu người dùng đã lưu
   static Future<UserModel?> getSavedUser() async {
     final prefs = await SharedPreferences.getInstance();
     final userData = prefs.getString('user_data');
@@ -112,13 +109,11 @@ class AuthController {
     return null;
   }
 
-  /// Lấy access token
   static Future<String?> getAccessToken() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('access_token');
   }
 
-  /// Lấy thông tin chi tiết người dùng (Profile)
   static Future<Map<String, dynamic>> getProfile() async {
     try {
       final token = await getAccessToken();
@@ -142,6 +137,111 @@ class AuthController {
         return {
           'success': false,
           'message': data['message'] ?? 'Không thể lấy thông tin cá nhân',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Lỗi kết nối: $e',
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateProfile({
+    required String fullname,
+    String? phone,
+    String? gender,
+    String? birthday,
+    String? address,
+    String? avatar,
+  }) async {
+    try {
+      final token = await getAccessToken();
+      if (token == null) return {'success': false, 'message': 'Chưa đăng nhập'};
+
+      final response = await http.put(
+        Uri.parse('$urlAPI/api/auth/profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'fullname': fullname,
+          'phone': phone,
+          'gender': gender,
+          'birthday': birthday,
+          'address': address,
+          'avatar': avatar,
+        }),
+      );
+
+      if (response.statusCode != 200) {
+        return {
+          'success': false,
+          'message': 'Server trả về lỗi (${response.statusCode}). Vui lòng thử lại sau.',
+        };
+      }
+
+      if (response.headers['content-type']?.contains('application/json') != true) {
+        return {
+          'success': false,
+          'message': 'Phản hồi từ server không hợp lệ. Vui lòng thử lại.',
+        };
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (data['success'] == true) {
+        final user = UserModel.fromJson(data['data']);
+        await _saveUserData(user);
+        return {'success': true, 'user': user};
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Không thể cập nhật thông tin',
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Lỗi kết nối: $e',
+      };
+    }
+  }
+
+  /// Đổi mật khẩu
+  static Future<Map<String, dynamic>> changePassword({
+    required String currentPassword,
+    required String username,
+    required String email,
+    required String newPassword,
+  }) async {
+    try {
+      final token = await getAccessToken();
+      if (token == null) return {'success': false, 'message': 'Chưa đăng nhập'};
+
+      final response = await http.post(
+        Uri.parse('$urlAPI/api/auth/change-password'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'currentPassword': currentPassword,
+          'username': username,
+          'email': email,
+          'newPassword': newPassword,
+        }),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {'success': true, 'message': data['message'] ?? 'Đổi mật khẩu thành công'};
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Đổi mật khẩu thất bại',
         };
       }
     } catch (e) {

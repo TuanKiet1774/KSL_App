@@ -4,8 +4,9 @@ import 'package:ksl/controller/auth_controller.dart';
 import 'package:ksl/model/user.dart';
 import 'package:ksl/view/account/login.dart';
 import 'package:ksl/component/confirmDialog.dart';
-import 'package:ksl/view/profile.dart';
+import 'package:ksl/view/account/profile.dart';
 import 'package:ksl/component/user_avatar.dart';
+import 'package:ksl/component/messDialog.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -76,59 +77,104 @@ class _SettingsViewState extends State<SettingsView> {
 
   Widget _buildProfileHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(32),
+        gradient: const LinearGradient(
+          colors: [AppColors.primaryBlue, AppColors.primaryTeal],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryTeal.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
       child: Column(
         children: [
-          // Avatar
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.primaryTeal.withOpacity(0.2), width: 2),
-            ),
-            child: UserAvatar(
-              imageUrl: _user?.avatar,
-              fullname: _user?.fullname ?? "K",
-              radius: 60,
-              fontSize: 40,
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Fullname
-          Text(
-            _user?.fullname ?? 'Người dùng KSL',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              color: AppColors.primaryBlue,
-            ),
-          ),
-          const SizedBox(height: 4),
-          // Username
-          Text(
-            '@${_user?.username ?? 'username'}',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 16),
-          // Level Chip
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.primaryTeal.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              _user?.level ?? 'Beginner',
-              style: const TextStyle(
-                color: AppColors.primaryTeal,
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+          Row(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.2),
+                      blurRadius: 15,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: CircleAvatar(
+                  radius: 42,
+                  backgroundColor: Colors.white.withOpacity(0.9),
+                  child: UserAvatar(
+                    imageUrl: _user?.avatar,
+                    fullname: _user?.fullname ?? "K",
+                    radius: 38,
+                    fontSize: 24,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _user?.fullname ?? '',
+                      style: const TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Level Badge and EXP
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.stars_rounded, color: Colors.amber, size: 14),
+                              const SizedBox(width: 4),
+                              Text(
+                                _user?.level ?? 'Beginner',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${_user?.exp ?? 0} EXP',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.6),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
