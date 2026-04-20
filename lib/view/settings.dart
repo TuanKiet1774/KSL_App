@@ -7,6 +7,7 @@ import 'package:ksl/component/confirmDialog.dart';
 import 'package:ksl/view/account/profile.dart';
 import 'package:ksl/component/user_avatar.dart';
 import 'package:ksl/component/messDialog.dart';
+import 'package:ksl/view/feedback.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -223,8 +224,19 @@ class _SettingsViewState extends State<SettingsView> {
           _buildDivider(),
           _buildMenuItem(
             icon: Icons.bar_chart_rounded,
-            title: 'Thống kê',
+            title: 'Phân tích thống kê',
             onTap: () {},
+          ),
+          _buildDivider(),
+          _buildMenuItem(
+            icon: Icons.star_border_rounded,
+            title: 'Đánh giá - phản hồi',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const FeedbackPage()),
+              );
+            },
           ),
           _buildDivider(),
           _buildMenuItem(
