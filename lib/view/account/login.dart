@@ -6,7 +6,6 @@ import 'package:ksl/view/home.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/view/account/register.dart';
 import 'package:ksl/component/confirmDialog.dart';
-import 'dart:io';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});

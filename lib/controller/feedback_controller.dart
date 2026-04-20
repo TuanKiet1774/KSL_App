@@ -4,7 +4,6 @@ import 'package:ksl/connectDB/api.dart';
 import 'package:ksl/controller/auth_controller.dart';
 
 class FeedbackController {
-  /// Gửi phản hồi của người dùng
   static Future<Map<String, dynamic>> sendFeedback({
     required int rating,
     required String comment,
@@ -54,7 +53,6 @@ class FeedbackController {
     }
   }
 
-  /// Lấy lịch sử phản hồi của người dùng
   static Future<Map<String, dynamic>> getFeedbackHistory() async {
     try {
       final token = await AuthController.getAccessToken();
@@ -75,7 +73,7 @@ class FeedbackController {
       if (response.statusCode == 200 && data['success'] == true) {
         return {
           'success': true,
-          'data': data['data'] // Danh sách feedbacks
+          'data': data['data'] 
         };
       } else {
         return {

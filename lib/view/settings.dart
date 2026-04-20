@@ -8,6 +8,7 @@ import 'package:ksl/view/account/profile.dart';
 import 'package:ksl/component/user_avatar.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/view/feedback.dart';
+import 'package:ksl/view/statistics.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -224,8 +225,13 @@ class _SettingsViewState extends State<SettingsView> {
           _buildDivider(),
           _buildMenuItem(
             icon: Icons.bar_chart_rounded,
-            title: 'Phân tích thống kê',
-            onTap: () {},
+            title: 'Thống kê học tập',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const StatisticsView()),
+              );
+            },
           ),
           _buildDivider(),
           _buildMenuItem(
