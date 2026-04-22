@@ -7,7 +7,7 @@ import 'package:ksl/view/favorite.dart';
 import 'package:ksl/view/translate.dart';
 import 'package:ksl/view/settings.dart';
 import 'package:ksl/view/infomation.dart';
-import 'package:ksl/view/lesson.dart';
+import 'package:ksl/view/topic_list.dart';
 
 import 'package:ksl/component/confirmDialog.dart';
 import 'package:ksl/component/avatar.dart';
@@ -54,8 +54,7 @@ class _HomePageState extends State<HomePage> {
           setState(() => _selectedIndex = 0);
           return false;
         }
-
-        // Hiện modal ngay lập tức và luôn chặn phím Back bằng cách trả về false
+        
         ConfirmDialog.show(
           context,
           title: 'Xác nhận thoát',

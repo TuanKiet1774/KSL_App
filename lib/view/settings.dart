@@ -9,6 +9,7 @@ import 'package:ksl/component/avatar.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/view/feedback.dart';
 import 'package:ksl/view/progress.dart';
+import 'package:ksl/view/learned_word_list.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -220,7 +221,12 @@ class _SettingsViewState extends State<SettingsView> {
           _buildMenuItem(
             icon: Icons.book_outlined,
             title: 'Từ vựng đã học',
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LearnedWordListScreen()),
+              );
+            },
           ),
           _buildDivider(),
           _buildMenuItem(

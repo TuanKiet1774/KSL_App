@@ -4,7 +4,7 @@ import 'package:ksl/controller/topic_controller.dart';
 import 'package:ksl/controller/progress_controller.dart';
 import 'package:ksl/model/topic.dart';
 import 'package:ksl/component/lazyLoading.dart';
-import 'package:ksl/component/sort.dart';
+import 'package:ksl/view/word_list.dart';
 
 class LessonPage extends StatefulWidget {
   const LessonPage({super.key});
@@ -24,7 +24,6 @@ class _LessonPageState extends State<LessonPage> {
   
   String _searchQuery = "";
   String _selectedLevel = "All";
-  SortOrder _currentSortOrder = SortOrder.ascending;
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -91,11 +90,8 @@ class _LessonPageState extends State<LessonPage> {
       return matchesSearch && matchesLevel;
     }).toList();
 
-    if (_currentSortOrder == SortOrder.ascending) {
-      filtered.sort((a, b) => a.name.compareTo(b.name));
-    } else if (_currentSortOrder == SortOrder.descending) {
-      filtered.sort((a, b) => b.name.compareTo(a.name));
-    }
+    // Mặc định sắp xếp theo thứ tự bảng chữ cái
+    filtered.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
     return filtered;
   }
@@ -116,16 +112,7 @@ class _LessonPageState extends State<LessonPage> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          SortAlphabetical(
-            currentOrder: _currentSortOrder,
-            onSortChanged: (order) {
-              setState(() {
-                _currentSortOrder = order;
-              });
-            },
-          ),
-        ],
+        actions: const [],
       ),
       body: Column(
         children: [
@@ -298,7 +285,14 @@ class _LessonPageState extends State<LessonPage> {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => WordListScreen(topic: topic),
+                ),
+              );
+            },
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
