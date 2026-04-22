@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:ksl/component/app_colors.dart';
+import 'package:ksl/component/appColors.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/controller/auth_controller.dart';
 import 'package:ksl/controller/feedback_controller.dart';
 import 'package:intl/intl.dart';
+import 'package:ksl/model/feedback.dart';
 
 class FeedbackPage extends StatefulWidget {
   const FeedbackPage({super.key});
@@ -119,7 +120,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _buildRatingCard(),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   _buildCommentCard(),
                   const SizedBox(height: 32),
                   _buildSubmitButton(),
@@ -142,15 +143,19 @@ class _FeedbackPageState extends State<FeedbackPage> {
           bottomLeft: Radius.circular(32),
           bottomRight: Radius.circular(32),
         ),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppColors.primaryTeal, Color(0xFF2D6A65)],
+        ),
       ),
       child: Column(
         children: [
-          const Icon(
-            Icons.rate_review_rounded,
-            size: 64,
-            color: Colors.white24,
+          Image.asset(
+            'assets/danhgia.png',
+            height: 150,
+            width: 150,
           ),
-          const SizedBox(height: 16),
           const Text(
             'Ý kiến của bạn rất quan trọng!',
             textAlign: TextAlign.center,
@@ -232,18 +237,12 @@ class _FeedbackPageState extends State<FeedbackPage> {
 
   String _getRatingText() {
     switch (_rating) {
-      case 1:
-        return 'Tệ';
-      case 2:
-        return 'Không hài lòng';
-      case 3:
-        return 'Bình thường';
-      case 4:
-        return 'Tốt';
-      case 5:
-        return 'Rất tuyệt vời!';
-      default:
-        return 'Chọn số sao';
+      case 1: return 'Tệ';
+      case 2: return 'Không hài lòng';
+      case 3: return 'Bình thường';
+      case 4: return 'Tốt';
+      case 5: return 'Rất tuyệt vời!';
+      default: return 'Chọn số sao';
     }
   }
 
@@ -369,7 +368,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                     );
                   }
 
-                  final List history = snapshot.data!['data'] ?? [];
+                  final List<FeedbackModel> history = snapshot.data!['data'] ?? [];
 
                   if (history.isEmpty) {
                     return const Center(
@@ -392,9 +391,9 @@ class _FeedbackPageState extends State<FeedbackPage> {
                     itemCount: history.length,
                     itemBuilder: (context, index) {
                       final item = history[index];
-                      final rating = item['rating'] ?? 0;
-                      final comment = item['comment'] ?? '';
-                      final dateStr = item['createdAt'] ?? '';
+                      final rating = item.rating;
+                      final comment = item.comment;
+                      final dateStr = item.createdAt;
                       String formattedDate = 'N/A';
                       if (dateStr.isNotEmpty) {
                         try {

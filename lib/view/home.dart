@@ -1,15 +1,16 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:ksl/component/app_colors.dart';
+import 'package:ksl/component/appColors.dart';
 import 'package:ksl/component/navigation.dart';
 import 'package:ksl/view/favorite.dart';
 import 'package:ksl/view/translate.dart';
 import 'package:ksl/view/settings.dart';
 import 'package:ksl/view/infomation.dart';
+import 'package:ksl/view/lesson.dart';
 
 import 'package:ksl/component/confirmDialog.dart';
-import 'package:ksl/component/user_avatar.dart';
+import 'package:ksl/component/avatar.dart';
 import 'package:ksl/model/user.dart';
 import 'package:ksl/controller/auth_controller.dart';
 
@@ -261,7 +262,12 @@ class HomeMainContent extends StatelessWidget {
                   _buildCategoryButton(
                     title: 'Chủ đề',
                     assetPath: 'assets/ChuDe.png',
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LessonPage()),
+                      );
+                    },
                   ),
                   const SizedBox(width: 15),
                   _buildCategoryButton(

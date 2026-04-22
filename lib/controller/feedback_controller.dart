@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:ksl/connectDB/api.dart';
 import 'package:ksl/controller/auth_controller.dart';
+import 'package:ksl/model/feedback.dart';
 
 class FeedbackController {
   static Future<Map<String, dynamic>> sendFeedback({
@@ -71,9 +72,12 @@ class FeedbackController {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
+        final List<dynamic> list = data['data'];
+        final feedbackList = list.map((item) => FeedbackModel.fromJson(item)).toList();
+        
         return {
           'success': true,
-          'data': data['data'] 
+          'data': feedbackList
         };
       } else {
         return {

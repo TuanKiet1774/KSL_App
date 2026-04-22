@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:ksl/component/app_colors.dart';
+import 'package:ksl/component/appColors.dart';
 import 'package:ksl/controller/auth_controller.dart';
 import 'package:ksl/model/user.dart';
 import 'package:ksl/view/account/login.dart';
 import 'package:ksl/component/confirmDialog.dart';
 import 'package:ksl/view/account/profile.dart';
-import 'package:ksl/component/user_avatar.dart';
+import 'package:ksl/component/avatar.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/view/feedback.dart';
-import 'package:ksl/view/statistics.dart';
+import 'package:ksl/view/progress.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});

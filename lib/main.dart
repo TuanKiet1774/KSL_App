@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ksl/view/account/login.dart';
-import 'package:ksl/component/app_colors.dart';
+import 'package:ksl/component/appColors.dart';
 
 void main() {
   runApp(const MyApp());

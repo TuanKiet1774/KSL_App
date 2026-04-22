@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ksl/component/app_colors.dart';
+import 'package:ksl/component/appColors.dart';
 
 class KslNavigationBar extends StatelessWidget {
   final int currentIndex;

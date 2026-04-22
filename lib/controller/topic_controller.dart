@@ -2,11 +2,12 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:ksl/connectDB/api.dart';
 import 'package:ksl/controller/auth_controller.dart';
-import 'package:ksl/model/progress.dart';
 
-class ProgressController {
-  /// Lấy thông tin tiến độ và thống kê của người dùng
-  static Future<Map<String, dynamic>> getUserProgress() async {
+import 'package:ksl/model/topic.dart';
+
+class TopicController {
+  /// Lấy danh sách tất cả các chủ đề với phân trang
+  static Future<Map<String, dynamic>> getAllTopics({int page = 1, int limit = 10}) async {
     try {
       final token = await AuthController.getAccessToken();
       if (token == null) {
@@ -14,7 +15,7 @@ class ProgressController {
       }
 
       final response = await http.get(
-        Uri.parse('$urlAPI/api/progress'),
+        Uri.parse('$urlAPI/api/topics?page=$page&limit=$limit'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -24,14 +25,17 @@ class ProgressController {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
+        final List<dynamic> topicJson = data['data'];
+        final List<TopicModel> topics = topicJson.map((json) => TopicModel.fromJson(json)).toList();
+        
         return {
           'success': true,
-          'data': ProgressModel.fromJson(data['data'])
+          'data': topics
         };
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Không thể lấy thông tin thống kê'
+          'message': data['message'] ?? 'Không thể lấy danh sách chủ đề'
         };
       }
     } catch (e) {

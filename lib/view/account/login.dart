@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:ksl/component/app_colors.dart';
+import 'package:ksl/component/appColors.dart';
 import 'package:ksl/controller/auth_controller.dart';
 import 'package:ksl/view/home.dart';
 import 'package:ksl/component/messDialog.dart';
@@ -169,15 +169,15 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   Widget _buildLogoCenter() {
     return Center(
       child: Container(
-        width: 140,
-        height: 140,
+        width: 200,
+        height: 200,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: Colors.white,
           boxShadow: [
             BoxShadow(
               color: AppColors.primaryTeal.withOpacity(0.1),
-              blurRadius: 30,
+              blurRadius: 20,
               offset: const Offset(0, 10),
             ),
           ],
