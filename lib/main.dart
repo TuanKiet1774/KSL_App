@@ -3,6 +3,9 @@ import 'package:ksl/view/account/login.dart';
 import 'package:ksl/component/appColors.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // Tăng kích thước bộ nhớ đệm ảnh (150MB) để lưu trữ các tệp GIF nặng tốt hơn
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 1024 * 1024 * 150;
   runApp(const MyApp());
 }
 

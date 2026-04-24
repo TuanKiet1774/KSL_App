@@ -1,10 +1,11 @@
+import 'package:ksl/model/word.dart';
+import 'package:ksl/model/topic.dart';
+
 class LearnedWordModel {
   final String id;
   final String userId;
-  final String wordId;
-  final String wordName;
-  final String topicId;
-  final String topicName;
+  final WordModel? wordId; // Populated word data
+  final TopicModel? topicId; // Populated topic data
   final int expGained;
   final DateTime learnedAt;
   final DateTime lastReviewed;
@@ -12,10 +13,8 @@ class LearnedWordModel {
   LearnedWordModel({
     required this.id,
     required this.userId,
-    required this.wordId,
-    required this.wordName,
-    required this.topicId,
-    required this.topicName,
+    this.wordId,
+    this.topicId,
     required this.expGained,
     required this.learnedAt,
     required this.lastReviewed,
@@ -25,10 +24,8 @@ class LearnedWordModel {
     return LearnedWordModel(
       id: json['_id'] ?? '',
       userId: json['userId'] is Map ? json['userId']['_id'] : (json['userId'] ?? ''),
-      wordId: json['wordId'] is Map ? json['wordId']['_id'] : (json['wordId'] ?? ''),
-      wordName: json['wordId'] is Map ? (json['wordId']['name'] ?? '') : '',
-      topicId: json['topicId'] is Map ? json['topicId']['_id'] : (json['topicId'] ?? ''),
-      topicName: json['topicId'] is Map ? (json['topicId']['name'] ?? '') : '',
+      wordId: json['wordId'] != null ? WordModel.fromJson(json['wordId']) : null,
+      topicId: json['topicId'] != null ? TopicModel.fromJson(json['topicId']) : null,
       expGained: json['expGained'] ?? 0,
       learnedAt: json['learnedAt'] != null 
           ? DateTime.parse(json['learnedAt']) 
@@ -43,10 +40,8 @@ class LearnedWordModel {
     return {
       '_id': id,
       'userId': userId,
-      'wordId': wordId,
-      'wordName': wordName,
-      'topicId': topicId,
-      'topicName': topicName,
+      'wordId': wordId?.toJson(),
+      'topicId': topicId?.toJson(),
       'expGained': expGained,
       'learnedAt': learnedAt.toIso8601String(),
       'lastReviewed': lastReviewed.toIso8601String(),

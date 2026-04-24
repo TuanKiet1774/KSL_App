@@ -5,8 +5,7 @@ import 'package:ksl/controller/auth_controller.dart';
 import 'package:ksl/model/word.dart';
 
 class WordController {
-  /// Lấy danh sách từ vựng theo Topic ID
-  static Future<Map<String, dynamic>> getWordsByTopic(String topicId) async {
+  static Future<Map<String, dynamic>> getWordsByTopic(String topicId, {int page = 1, int limit = 10}) async {
     try {
       final token = await AuthController.getAccessToken();
       if (token == null) {
@@ -14,7 +13,7 @@ class WordController {
       }
 
       final response = await http.get(
-        Uri.parse('$urlAPI/api/words?topicId=$topicId'),
+        Uri.parse('$urlAPI/api/words?topicId=$topicId&page=$page&limit=$limit&sortBy=name&sortOrder=asc'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',

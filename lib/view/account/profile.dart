@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:ksl/component/appColors.dart';
 import 'package:ksl/controller/auth_controller.dart';
@@ -22,6 +23,10 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ));
     _fetchProfile();
   }
 
@@ -198,29 +203,29 @@ class _ProfilePageState extends State<ProfilePage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: Colors.transparent,
+        automaticallyImplyLeading: false,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          statusBarBrightness: Brightness.dark,
+        ),
         leading: IconButton(
           icon: Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.9),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primaryBlue, size: 20),
+            child: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           ),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
             icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.edit_rounded, color: AppColors.primaryTeal, size: 20),
+              child: const Icon(Icons.edit_rounded, color: Colors.white, size: 20),
             ),
             onPressed: () {
-              if (_user != null) {
+              if (AuthController.userNotifier.value != null) {
                 _showPasswordDialog();
               }
             },
@@ -232,7 +237,16 @@ class _ProfilePageState extends State<ProfilePage> {
           ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
           : _errorMessage != null
               ? _buildErrorView()
-              : _buildProfileContent(),
+              : ValueListenableBuilder<UserModel?>(
+                  valueListenable: AuthController.userNotifier,
+                  builder: (context, user, _) {
+                    return MediaQuery.removePadding(
+                      context: context,
+                      removeTop: true,
+                      child: _buildProfileContent(user),
+                    );
+                  },
+                ),
     );
   }
 
@@ -255,22 +269,23 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildProfileContent() {
+  Widget _buildProfileContent(UserModel? user) {
     return SingleChildScrollView(
+      padding: EdgeInsets.zero,
       physics: const BouncingScrollPhysics(),
       child: Column(
         children: [
-          _buildHeader(),
+          _buildHeader(user),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
             child: Column(
               children: [
                 _buildInfoSection('Thông tin cơ bản', [
-                  _infoItem(Icons.email_outlined, 'Email', _user?.email),
-                  _infoItem(Icons.phone_outlined, 'Số điện thoại', _user?.phone),
-                  _infoItem(Icons.wc_rounded, 'Giới tính', _user?.gender),
-                  _infoItem(Icons.cake_outlined, 'Ngày sinh', _formatDate(_user?.birthday)),
-                  _infoItem(Icons.location_on_outlined, 'Địa chỉ', _user?.address),
+                  _infoItem(Icons.email_outlined, 'Email', user?.email),
+                  _infoItem(Icons.phone_outlined, 'Số điện thoại', user?.phone),
+                  _infoItem(Icons.wc_rounded, 'Giới tính', user?.gender),
+                  _infoItem(Icons.cake_outlined, 'Ngày sinh', _formatDate(user?.birthday)),
+                  _infoItem(Icons.location_on_outlined, 'Địa chỉ', user?.address),
                 ]),
                 const SizedBox(height: 24),
                 // Change Password Button
@@ -532,7 +547,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(UserModel? user) {
     return Stack(
       alignment: Alignment.bottomCenter,
       children: [
@@ -577,15 +592,15 @@ class _ProfilePageState extends State<ProfilePage> {
                   shape: BoxShape.circle,
                 ),
                 child: UserAvatar(
-                  imageUrl: _user?.avatar,
-                  fullname: _user?.fullname ?? 'K',
+                  imageUrl: user?.avatar,
+                  fullname: user?.fullname ?? 'K',
                   radius: 60,
                   fontSize: 40,
                 ),
               ),
               const SizedBox(height: 16),
               Text(
-                _user?.fullname ?? 'Người dùng KSL',
+                user?.fullname ?? 'Người dùng KSL',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 26,
@@ -594,7 +609,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
               const SizedBox(height: 4),
               Text(
-                '@${_user?.username ?? 'username'}',
+                '@${user?.username ?? 'username'}',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.8),
                   fontSize: 16,

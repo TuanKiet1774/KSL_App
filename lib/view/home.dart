@@ -78,23 +78,34 @@ class _HomePageState extends State<HomePage> {
           });
         },
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 400),
-        switchInCurve: Curves.easeInOut,
-        switchOutCurve: Curves.easeInOut,
-        transitionBuilder: (Widget child, Animation<double> animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.05, 0), // Lướt nhẹ từ phải sang
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
-            ),
+      body: ValueListenableBuilder<UserModel?>(
+        valueListenable: AuthController.userNotifier,
+        builder: (context, user, _) {
+          final List<Widget> pages = [
+            HomeMainContent(user: user),
+            const FavoriteView(),
+            const TranslateView(),
+            const SettingsView(),
+          ];
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 400),
+            switchInCurve: Curves.easeInOut,
+            switchOutCurve: Curves.easeInOut,
+            transitionBuilder: (Widget child, Animation<double> animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.05, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            child: pages[_selectedIndex],
           );
         },
-        child: pages[_selectedIndex],
       ),
     ));
   }

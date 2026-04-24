@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:ksl/component/appColors.dart';
 import 'package:ksl/controller/learned_word_controller.dart';
+import 'package:ksl/component/confirmDialog.dart';
+import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/model/learned_word.dart';
-import 'package:intl/intl.dart';
+import 'package:ksl/view/learned_word_detail.dart';
+import 'package:ksl/controller/auth_controller.dart';
+
+import '../component/loadingEffect.dart';
 
 class LearnedWordListScreen extends StatefulWidget {
   const LearnedWordListScreen({super.key});
@@ -15,31 +21,96 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
   List<LearnedWordModel> _learnedWords = [];
   bool _isLoading = true;
   String _errorMessage = "";
+  bool _isSelectionMode = false;
+  final Set<String> _selectedWordIds = {};
+  
+  // Phân trang
+  final ScrollController _scrollController = ScrollController();
+  int _currentPage = 1;
+  bool _hasMore = true;
+  bool _isFetchingMore = false;
+  final int _limit = 10;
 
   @override
   void initState() {
     super.initState();
     _fetchLearnedWords();
+    _syncUserExp();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (_hasMore && !_isFetchingMore && !_isLoading) {
+        _fetchMoreLearnedWords();
+      }
+    }
+  }
+
+  Future<void> _syncUserExp() async {
+    final result = await LearnedWordController.syncExp();
+    if (mounted && result['success']) {
+      // AuthController.getProfile() sẽ tự động cập nhật userNotifier
+      await AuthController.getProfile();
+    }
   }
 
   Future<void> _fetchLearnedWords() async {
     setState(() {
       _isLoading = true;
       _errorMessage = "";
+      _currentPage = 1;
+      _hasMore = true;
     });
 
-    final result = await LearnedWordController.getMyLearnedWords();
+    final result = await LearnedWordController.getMyLearnedWords(page: _currentPage, limit: _limit);
 
     if (mounted) {
       setState(() {
         if (result['success']) {
           _learnedWords = result['data'];
-          // Sắp xếp theo thời gian học mới nhất
-          _learnedWords.sort((a, b) => b.learnedAt.compareTo(a.learnedAt));
+          if (_learnedWords.length < _limit) {
+            _hasMore = false;
+          }
         } else {
           _errorMessage = result['message'];
         }
         _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchMoreLearnedWords() async {
+    if (_isFetchingMore) return;
+
+    setState(() {
+      _isFetchingMore = true;
+    });
+
+    final nextPage = _currentPage + 1;
+    final result = await LearnedWordController.getMyLearnedWords(page: nextPage, limit: _limit);
+
+    if (mounted) {
+      setState(() {
+        if (result['success']) {
+          final List<LearnedWordModel> newWords = result['data'];
+          if (newWords.isEmpty) {
+            _hasMore = false;
+          } else {
+            _learnedWords.addAll(newWords);
+            _currentPage = nextPage;
+            if (newWords.length < _limit) {
+              _hasMore = false;
+            }
+          }
+        }
+        _isFetchingMore = false;
       });
     }
   }
@@ -49,30 +120,62 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
-        title: const Text(
-          'Từ vựng đã học',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Text(
+          _isSelectionMode ? 'Đã chọn ${_selectedWordIds.length}' : 'Từ vựng đã học',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: AppColors.primaryTeal,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          icon: Icon(_isSelectionMode ? Icons.close_rounded : Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          onPressed: () {
+            if (_isSelectionMode) {
+              setState(() {
+                _isSelectionMode = false;
+                _selectedWordIds.clear();
+              });
+            } else {
+              Navigator.pop(context);
+            }
+          },
         ),
+        actions: [
+          if (_learnedWords.isNotEmpty)
+            IconButton(
+              icon: Icon(_isSelectionMode ? Icons.select_all_rounded : Icons.edit_note_rounded, color: Colors.white),
+              onPressed: () {
+                setState(() {
+                  if (!_isSelectionMode) {
+                    _isSelectionMode = true;
+                  } else {
+                    if (_selectedWordIds.length == _learnedWords.length) {
+                      _selectedWordIds.clear();
+                    } else {
+                      _selectedWordIds.addAll(_learnedWords.map((w) => w.id));
+                    }
+                  }
+                });
+              },
+            ),
+          if (_isSelectionMode && _selectedWordIds.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+              onPressed: _showBulkDeleteConfirmation,
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
           : _errorMessage.isNotEmpty
               ? _buildErrorState()
-              : SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: Column(
-                    children: [
-                      _buildHeader(),
-                      _learnedWords.isEmpty ? _buildEmptyState() : _buildLearnedWordList(),
-                    ],
-                  ),
+              : Column(
+                  children: [
+                    _buildHeader(),
+                    Expanded(
+                      child: _learnedWords.isEmpty ? _buildEmptyState() : _buildLearnedWordList(),
+                    ),
+                  ],
                 ),
     );
   }
@@ -97,8 +200,8 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
         children: [
           Image.asset(
             'assets/tuvungdahoc.png',
-            height: 150,
-            width: 150,
+            height: 100,
+            width: 100,
             errorBuilder: (context, error, stackTrace) =>
                 const Icon(Icons.book_rounded, size: 100, color: Colors.white24),
           ),
@@ -113,16 +216,6 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
               letterSpacing: 0.5,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Xem lại danh sách các từ vựng bạn đã chinh phục và tiếp tục hành trình mở rộng kiến thức',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 14,
-              height: 1.4,
-            ),
-          ),
         ],
       ),
     );
@@ -130,77 +223,223 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
 
   Widget _buildLearnedWordList() {
     return ListView.builder(
-      shrinkWrap: true,
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _learnedWords.length,
+      controller: _scrollController,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+      itemCount: _learnedWords.length + (_hasMore ? 1 : 0),
       itemBuilder: (context, index) {
+        if (index == _learnedWords.length) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Center(child: CircularProgressIndicator(color: AppColors.primaryTeal)),
+          );
+        }
         final learned = _learnedWords[index];
-        return _buildLearnedWordCard(learned);
+        return _buildDismissibleCard(learned, index);
       },
     );
   }
 
-  Widget _buildLearnedWordCard(LearnedWordModel learned) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+  Widget _buildDismissibleCard(LearnedWordModel learned, int index) {
+    return Dismissible(
+      key: Key(learned.id),
+      direction: _isSelectionMode ? DismissDirection.none : DismissDirection.endToStart,
+      background: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Colors.redAccent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 30),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  learned.wordName,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primaryBlue,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Chủ đề: ${learned.topicName}',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Ngày học: ${DateFormat('dd/MM/yyyy HH:mm').format(learned.learnedAt)}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: AppColors.accentOrange.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              '+${learned.expGained} EXP',
-              style: const TextStyle(
-                color: AppColors.accentOrange,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
+      confirmDismiss: (direction) async {
+        return await _showDeleteConfirmation(learned);
+      },
+      onDismissed: (direction) {
+        _deleteSingleWord(learned.id, index);
+      },
+      child: _buildLearnedWordCard(learned, index),
+    );
+  }
+
+  Widget _buildLearnedWordCard(LearnedWordModel learned, int index) {
+    bool isSelected = _selectedWordIds.contains(learned.id);
+
+    return GestureDetector(
+      onLongPress: () {
+        if (!_isSelectionMode) {
+          setState(() {
+            _isSelectionMode = true;
+            _selectedWordIds.add(learned.id);
+          });
+        }
+      },
+      onTap: () {
+        if (_isSelectionMode) {
+          setState(() {
+            if (isSelected) {
+              _selectedWordIds.remove(learned.id);
+              if (_selectedWordIds.isEmpty) {
+                _isSelectionMode = false;
+              }
+            } else {
+              _selectedWordIds.add(learned.id);
+            }
+          });
+        } else {
+          // Xem chi tiết và cho phép lướt qua các từ khác
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => LearnedWordDetailScreen(
+                learnedWords: _learnedWords,
+                initialIndex: index,
               ),
             ),
+          );
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryTeal.withOpacity(0.05) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppColors.primaryTeal : Colors.transparent,
+            width: 2,
           ),
-        ],
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            if (_isSelectionMode)
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Icon(
+                  isSelected ? Icons.check_circle_rounded : Icons.radio_button_off_rounded,
+                  color: isSelected ? AppColors.primaryTeal : Colors.grey,
+                ),
+              ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    learned.wordId?.name ?? 'Không rõ',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primaryBlue,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Chủ đề: ${learned.topicId?.name ?? 'Không rõ'}',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ngày học: ${DateFormat('dd/MM/yyyy HH:mm').format(learned.learnedAt)}',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.accentOrange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '+${learned.expGained} EXP',
+                style: const TextStyle(
+                  color: AppColors.accentOrange,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<bool?> _showDeleteConfirmation(LearnedWordModel learned) async {
+    bool? result;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => ConfirmDialog(
+        title: 'Xóa từ vựng',
+        message: 'Bạn có chắc chắn muốn xóa "${learned.wordId?.name ?? 'từ vựng này'}" khỏi danh sách đã học?',
+        icon: Icons.delete_outline_rounded,
+        color: Colors.redAccent,
+        onConfirm: () {
+          result = true;
+        },
+      ),
+    );
+    return result;
+  }
+
+  Future<void> _showBulkDeleteConfirmation() async {
+    ConfirmDialog.show(
+      context,
+      title: 'Xóa nhiều từ vựng',
+      message: 'Bạn có chắc chắn muốn xóa ${_selectedWordIds.length} từ vựng đã chọn?',
+      icon: Icons.delete_sweep_rounded,
+      color: Colors.redAccent,
+      confirmText: 'Xóa tất cả',
+      onConfirm: _deleteMultipleWords,
+    );
+  }
+
+  Future<void> _deleteSingleWord(String id, int index) async {
+    final result = await LearnedWordController.deleteLearnedWord(id);
+    if (mounted) {
+      if (result['success']) {
+        setState(() {
+          _learnedWords.removeAt(index);
+        });
+        _syncUserExp(); // Đồng bộ lại EXP sau khi xóa
+        MessDialog.showSuccessDialog(context, 'Thành công', result['message']);
+      } else {
+        MessDialog.showErrorDialog(context, 'Lỗi', result['message']);
+        _fetchLearnedWords(); // Reload on failure
+      }
+    }
+  }
+
+  Future<void> _deleteMultipleWords() async {
+    setState(() => _isLoading = true);
+    
+    final result = await LearnedWordController.deleteMultipleLearnedWords(_selectedWordIds.toList());
+    
+    if (mounted) {
+      if (result['success']) {
+        setState(() {
+          _learnedWords.removeWhere((w) => _selectedWordIds.contains(w.id));
+          _selectedWordIds.clear();
+          _isSelectionMode = false;
+          _isLoading = false;
+        });
+        _syncUserExp(); // Đồng bộ lại EXP sau khi xóa hàng loạt
+        MessDialog.showSuccessDialog(context, 'Thành công', result['message']);
+      } else {
+        setState(() => _isLoading = false);
+        MessDialog.showErrorDialog(context, 'Lỗi', result['message']);
+      }
+    }
   }
 
   Widget _buildErrorState() {
@@ -223,6 +462,7 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          const SizedBox(height: 70),
           Icon(Icons.menu_book_rounded, size: 80, color: Colors.grey.shade300),
           const SizedBox(height: 16),
           const Text(

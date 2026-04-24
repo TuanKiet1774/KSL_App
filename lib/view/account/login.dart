@@ -6,6 +6,7 @@ import 'package:ksl/view/home.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/view/account/register.dart';
 import 'package:ksl/component/confirmDialog.dart';
+import 'package:ksl/component/background_prefetcher.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -79,6 +80,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         'Thành công',
         'Đăng nhập thành công!',
       );
+
+      // Khởi động lấy dữ liệu ngầm ngay khi đăng nhập thành công
+      BackgroundPrefetcher.start();
 
       Future.delayed(const Duration(milliseconds: 1500), () {
         if (mounted) {

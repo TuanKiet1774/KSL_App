@@ -4,6 +4,7 @@ import 'package:ksl/controller/word_controller.dart';
 import 'package:ksl/controller/learned_word_controller.dart';
 import 'package:ksl/model/word.dart';
 import 'package:ksl/model/topic.dart';
+import 'package:ksl/component/loadingEffect.dart';
 
 class WordListScreen extends StatefulWidget {
   final TopicModel topic;
@@ -15,11 +16,18 @@ class WordListScreen extends StatefulWidget {
 }
 
 class _WordListScreenState extends State<WordListScreen> {
-  List<WordModel> _words = [];
+  List<WordModel> _visibleWords = []; // Các từ đang hiển thị trong PageView
   bool _isLoading = true;
   String _errorMessage = "";
   final PageController _pageController = PageController();
   int _currentIndex = 0;
+  
+  // Logic phân đoạn 10 từ (Server-side)
+  int _currentPage = 1;
+  final int _batchSize = 10;
+  final int _threshold = 5; 
+  bool _hasMore = true;
+  bool _isFetchingMore = false;
 
   @override
   void initState() {
@@ -37,25 +45,79 @@ class _WordListScreenState extends State<WordListScreen> {
     setState(() {
       _isLoading = true;
       _errorMessage = "";
+      _visibleWords = [];
+      _currentIndex = 0;
+      _currentPage = 1;
+      _hasMore = true;
     });
 
-    final result = await WordController.getWordsByTopic(widget.topic.id);
+    final result = await WordController.getWordsByTopic(widget.topic.id, page: _currentPage, limit: _batchSize);
 
     if (mounted) {
-      setState(() {
-        if (result['success']) {
-          _words = result['data'];
-          _words.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      if (result['success']) {
+        final List<WordModel> newWords = result['data'];
+        _visibleWords = newWords;
+        
+        if (newWords.length < _batchSize) {
+          _hasMore = false;
         } else {
-          _errorMessage = result['message'];
+          _hasMore = true;
         }
-        _isLoading = false;
-      });
+
+        // Tải ảnh ngầm, không đợi xong hết mới hiện UI
+        _precacheImages(_visibleWords);
+        
+        setState(() {
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = result['message'];
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _precacheImages(List<WordModel> words) {
+    for (var word in words) {
+      if (word.media.url.isNotEmpty) {
+        precacheImage(NetworkImage(word.media.url), context).catchError((e) => null);
+      }
+    }
+  }
+
+  Future<void> _loadNextBatch() async {
+    if (!_hasMore || _isFetchingMore) return;
+
+    _isFetchingMore = true;
+    final int nextPage = _currentPage + 1;
+
+    final result = await WordController.getWordsByTopic(widget.topic.id, page: nextPage, limit: _batchSize);
+    
+    if (mounted) {
+      if (result['success']) {
+        final List<WordModel> nextWords = result['data'];
+        if (nextWords.isNotEmpty) {
+          setState(() {
+            _visibleWords.addAll(nextWords);
+            _currentPage = nextPage;
+            if (nextWords.length < _batchSize) {
+              _hasMore = false;
+            }
+          });
+          _precacheImages(nextWords);
+        } else {
+          _hasMore = false;
+        }
+      }
+      _isFetchingMore = false;
     }
   }
 
   Future<void> _markAsLearned(int index) async {
-    final word = _words[index];
+    if (index >= _visibleWords.length) return;
+    final word = _visibleWords[index];
     await LearnedWordController.markAsLearned(
       wordId: word.id,
       topicId: widget.topic.id,
@@ -64,8 +126,8 @@ class _WordListScreenState extends State<WordListScreen> {
   }
 
   void _nextPage() {
-    if (_currentIndex < _words.length - 1) {
-      _markAsLearned(_currentIndex); // Lưu tiến trình từ hiện tại
+    if (_currentIndex < _visibleWords.length - 1) {
+      _markAsLearned(_currentIndex); 
       _pageController.nextPage(
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOutQuart,
@@ -88,7 +150,6 @@ class _WordListScreenState extends State<WordListScreen> {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // Nội dung chính
           Column(
             children: [
               Expanded(
@@ -96,11 +157,11 @@ class _WordListScreenState extends State<WordListScreen> {
                     ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
                     : _errorMessage.isNotEmpty
                         ? _buildErrorState()
-                        : _words.isEmpty
+                        : _visibleWords.isEmpty
                             ? _buildEmptyState()
                             : _buildWordPageView(),
               ),
-              if (!_isLoading && _words.isNotEmpty) _buildNavigationControls(),
+              if (!_isLoading && _visibleWords.isNotEmpty) _buildNavigationControls(),
             ],
           ),
 
@@ -116,14 +177,14 @@ class _WordListScreenState extends State<WordListScreen> {
             ),
           ),
 
-          if (!_isLoading && _words.isNotEmpty)
+          if (!_isLoading && _visibleWords.isNotEmpty)
             Positioned(
               top: MediaQuery.of(context).padding.top + 22,
               left: 0,
               right: 0,
               child: Center(
                 child: Text(
-                  '${_currentIndex + 1} / ${_words.length}',
+                  '${_currentIndex + 1} / ${_visibleWords.length}${_hasMore ? '+' : ''}',
                   style: const TextStyle(
                     color: AppColors.primaryBlue,
                     fontWeight: FontWeight.bold,
@@ -144,13 +205,17 @@ class _WordListScreenState extends State<WordListScreen> {
         if (index > _currentIndex) {
           _markAsLearned(_currentIndex);
         }
+        
         setState(() {
           _currentIndex = index;
         });
+        if (_visibleWords.length - index <= _threshold) {
+          _loadNextBatch();
+        }
       },
-      itemCount: _words.length,
+      itemCount: _visibleWords.length,
       itemBuilder: (context, index) {
-        return _buildWordContent(_words[index]);
+        return _buildWordContent(_visibleWords[index]);
       },
     );
   }
@@ -192,6 +257,19 @@ class _WordListScreenState extends State<WordListScreen> {
                           child: Image.network(
                             word.media.url,
                             fit: BoxFit.cover,
+                            gaplessPlayback: true,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  value: loadingProgress.expectedTotalBytes != null
+                                      ? loadingProgress.cumulativeBytesLoaded /
+                                          loadingProgress.expectedTotalBytes!
+                                      : null,
+                                  color: AppColors.primaryTeal.withOpacity(0.5),
+                                ),
+                              );
+                            },
                             errorBuilder: (context, error, stackTrace) =>
                                 const Icon(Icons.image_not_supported_rounded, size: 60, color: Colors.grey),
                           ),
@@ -325,9 +403,9 @@ class _WordListScreenState extends State<WordListScreen> {
           const SizedBox(width: 15),
           Expanded(
             child: _buildMainNavButton(
-              label: _currentIndex == _words.length - 1 ? 'HOÀN THÀNH' : 'TIẾP THEO',
+              label: (_currentIndex == _visibleWords.length - 1 && !_hasMore) ? 'HOÀN THÀNH' : 'TIẾP THEO',
               onTap: () async {
-                if (_currentIndex == _words.length - 1) {
+                if (_currentIndex == _visibleWords.length - 1 && !_hasMore) {
                   await _markAsLearned(_currentIndex);
                   Navigator.pop(context);
                 } else {

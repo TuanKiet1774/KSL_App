@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ksl/connectDB/api.dart';
 import 'package:ksl/model/user.dart';
 
 class AuthController {
+  static final ValueNotifier<UserModel?> userNotifier = ValueNotifier<UserModel?>(null);
+
   /// Đăng nhập với username và password
   static Future<Map<String, dynamic>> login(String username, String password) async {
     try {
@@ -93,6 +96,9 @@ class AuthController {
     await prefs.setString('access_token', user.accessToken);
     await prefs.setString('refresh_token', user.refreshToken);
     await prefs.setBool('is_logged_in', true);
+    
+    // Cập nhật notifier để giao diện thay đổi realtime
+    userNotifier.value = user;
   }
 
   static Future<bool> isLoggedIn() async {
@@ -104,7 +110,9 @@ class AuthController {
     final prefs = await SharedPreferences.getInstance();
     final userData = prefs.getString('user_data');
     if (userData != null) {
-      return UserModel.fromJson(jsonDecode(userData));
+      final user = UserModel.fromJson(jsonDecode(userData));
+      userNotifier.value = user; // Khởi tạo giá trị ban đầu cho notifier
+      return user;
     }
     return null;
   }
