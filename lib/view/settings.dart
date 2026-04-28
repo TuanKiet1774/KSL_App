@@ -123,12 +123,10 @@ class _SettingsViewState extends State<SettingsView> {
             ),
           ),
           const SizedBox(width: 20),
-          // Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Fullname
                 Text(
                   _user?.fullname ?? '',
                   style: const TextStyle(

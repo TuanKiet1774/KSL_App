@@ -15,6 +15,7 @@ class StatisticsView extends StatefulWidget {
 class _StatisticsViewState extends State<StatisticsView> {
   ProgressModel? _progressData;
   bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -23,12 +24,17 @@ class _StatisticsViewState extends State<StatisticsView> {
   }
 
   Future<void> _fetchData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
     final result = await ProgressController.getUserProgress();
     if (mounted) {
       setState(() {
         if (result['success']) {
           _progressData = result['data'];
+        } else {
+          _errorMessage = result['message'];
         }
         _isLoading = false;
       });
@@ -64,15 +70,17 @@ class _StatisticsViewState extends State<StatisticsView> {
       ),
       body: _isLoading
           ? _buildLoadingState()
-          : SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                children: [
-                  _buildHeader(),
-                  _buildContent(),
-                ],
-              ),
-            ),
+          : _errorMessage != null
+              ? _buildErrorState()
+              : SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    children: [
+                      _buildHeader(),
+                      _buildContent(),
+                    ],
+                  ),
+                ),
     );
   }
 
@@ -110,17 +118,26 @@ class _StatisticsViewState extends State<StatisticsView> {
               letterSpacing: 0.5,
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Theo dõi sự tiến bộ và thành tích mỗi ngày để đạt được mục tiêu học tập của bạn',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 14,
-              height: 1.4,
-            ),
-          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage ?? 'Đã có lỗi xảy ra',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -154,31 +171,59 @@ class _StatisticsViewState extends State<StatisticsView> {
   }
 
   Widget _buildQuickStatsGrid() {
-    // Lưu ý: Thông tin streak và exp có thể được tính từ accessHistory hoặc lấy từ user model.
-    // Ở đây ta dùng giá trị mô phỏng hoặc từ một trường mở rộng nếu có.
-    final streak = _progressData?.accessHistory.length ?? 0;
-    final totalSessions = _progressData?.accessHistory.length ?? 0;
+    final streak = _progressData?.stats.streakDays ?? 0;
+    final totalWordsLearned = _progressData?.stats.totalWordsLearned ?? 0;
+    final totalExp = _progressData?.stats.totalExp ?? 0;
+    final totalLearningMinutes = _progressData?.stats.totalLearningMinutes ?? 0.0;
 
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _premiumStatCard(
-            title: 'Chuỗi ngày',
-            value: '$streak',
-            unit: 'ngày',
-            icon: Icons.local_fire_department_rounded,
-            colors: [const Color(0xFFFF9D6C), const Color(0xFFBB4E75)],
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _premiumStatCard(
+                title: 'Chuỗi ngày',
+                value: '$streak',
+                unit: 'ngày',
+                icon: Icons.local_fire_department_rounded,
+                colors: [const Color(0xFFFF9D6C), const Color(0xFFBB4E75)],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _premiumStatCard(
+                title: 'Từ đã học',
+                value: '$totalWordsLearned',
+                unit: 'từ',
+                icon: Icons.menu_book_rounded,
+                colors: [const Color(0xFF64E8DE), const Color(0xFF82BBFF)],
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _premiumStatCard(
-            title: 'Tổng phiên học',
-            value: '$totalSessions',
-            unit: 'phiên',
-            icon: Icons.auto_awesome_rounded,
-            colors: [const Color(0xFF64E8DE), const Color(0xFF82BBFF)],
-          ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _premiumStatCard(
+                title: 'Tổng EXP',
+                value: '$totalExp',
+                unit: 'exp',
+                icon: Icons.auto_awesome_rounded,
+                colors: [const Color(0xFFFFC845), const Color(0xFFFF6B6B)],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _premiumStatCard(
+                title: 'Thời gian học',
+                value: totalLearningMinutes.toStringAsFixed(0),
+                unit: 'phút',
+                icon: Icons.timer_rounded,
+                colors: [const Color(0xFF84FAB0), const Color(0xFF8FD3F4)],
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -421,11 +466,13 @@ class _StatisticsViewState extends State<StatisticsView> {
                   rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 ),
                 borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    spots: List.generate(displayDates.length, (index) {
-                      return FlSpot(index.toDouble(), dailyStats[displayDates[index]]!);
-                    }),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: List.generate(displayDates.length, (index) {
+                        final dateStr = displayDates[index];
+                        final val = dailyStats[dateStr] ?? 0.0;
+                        return FlSpot(index.toDouble(), val);
+                      }),
                     isCurved: true,
                     gradient: const LinearGradient(
                       colors: [AppColors.primaryTeal, Color(0xFF64E8DE)],
@@ -529,7 +576,7 @@ class _StatisticsViewState extends State<StatisticsView> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Chủ đề #${index + 1}',
+                          topic.topicName.isNotEmpty ? topic.topicName : 'Chủ đề #${index + 1}',
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,

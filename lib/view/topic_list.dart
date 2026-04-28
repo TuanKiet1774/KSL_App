@@ -6,6 +6,8 @@ import 'package:ksl/model/topic.dart';
 import 'package:ksl/component/lazyLoading.dart';
 import 'package:ksl/view/word_list.dart';
 
+import '../model/progress.dart';
+
 class LessonPage extends StatefulWidget {
   const LessonPage({super.key});
 
@@ -15,7 +17,7 @@ class LessonPage extends StatefulWidget {
 
 class _LessonPageState extends State<LessonPage> {
   List<TopicModel> _allTopics = [];
-  Map<String, dynamic> _userProgress = {};
+  ProgressModel? _userProgress;
   bool _isLoading = true;
   bool _isFetchingMore = false;
   bool _hasMore = true;
@@ -38,11 +40,11 @@ class _LessonPageState extends State<LessonPage> {
     super.dispose();
   }
 
-  Future<void> _fetchData({bool isLoadMore = false}) async {
+  Future<void> _fetchData({bool isLoadMore = false, bool showLoading = true}) async {
     if (isLoadMore) {
       if (_isFetchingMore || !_hasMore) return;
       setState(() => _isFetchingMore = true);
-    } else {
+    } else if (showLoading) {
       setState(() {
         _isLoading = true;
         _currentPage = 1;
@@ -50,23 +52,36 @@ class _LessonPageState extends State<LessonPage> {
         _hasMore = true;
       });
     }
+
+    final bool shouldFetchTopics = showLoading || _allTopics.isEmpty || isLoadMore;
     
-    final topicResult = await TopicController.getAllTopics(page: _currentPage, limit: _limit);
+    dynamic topicResult;
+    if (shouldFetchTopics) {
+      topicResult = await TopicController.getAllTopics(page: _currentPage, limit: _limit);
+    }
+    
     final progressResult = await ProgressController.getUserProgress();
     
     if (mounted) {
       setState(() {
-        if (topicResult['success']) {
-          final List<TopicModel> newTopics = topicResult['data'];
-          if (newTopics.length < _limit) {
-            _hasMore = false;
+        if (shouldFetchTopics && topicResult != null) {
+          if (topicResult['success']) {
+            final List<TopicModel> newTopics = topicResult['data'];
+            if (newTopics.length < _limit) {
+              _hasMore = false;
+            } else {
+              _hasMore = true;
+              _currentPage++;
+            }
+            
+            if (showLoading) {
+              _allTopics = newTopics;
+            } else {
+              _allTopics.addAll(newTopics);
+            }
           } else {
-            _hasMore = true;
-            _currentPage++;
+            _hasMore = false;
           }
-          _allTopics.addAll(newTopics);
-        } else {
-          _hasMore = false;
         }
 
         if (progressResult['success']) {
@@ -149,12 +164,6 @@ class _LessonPageState extends State<LessonPage> {
       ),
       child: Column(
         children: [
-          const Text(
-            'Khám phá kiến thức mới qua các chủ đề thú vị',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70, fontSize: 14),
-          ),
-          const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
@@ -171,9 +180,6 @@ class _LessonPageState extends State<LessonPage> {
             child: TextField(
               onChanged: (value) {
                 _searchQuery = value;
-                // Lưu ý: Lazy loading với search offline có thể không khớp với data online.
-                // Nếu search online thì cần reset pagination.
-                // Ở đây ta lọc offline danh sách đã tải.
                 setState(() {}); 
               },
               decoration: const InputDecoration(
@@ -259,13 +265,19 @@ class _LessonPageState extends State<LessonPage> {
 
   Widget _buildTopicCard(TopicModel topic) {
     final topicId = topic.id;
-    final progressList = (_userProgress['topicProgress'] as List?) ?? [];
-    final topicProgress = progressList.firstWhere(
-      (p) => p['topicId'].toString() == topicId || p['topicId']['_id'].toString() == topicId,
-      orElse: () => null,
-    );
+    final progressList = _userProgress?.topicProgress ?? [];
     
-    final double percentage = (topicProgress?['percentage'] ?? 0).toDouble();
+    // Tìm topicProgress tương ứng
+    TopicProgressModel? topicProgress;
+    try {
+      topicProgress = progressList.firstWhere(
+        (p) => p.topicId.toString().trim() == topicId.toString().trim(),
+      );
+    } catch (_) {
+      topicProgress = null;
+    }
+    
+    final double percentage = topicProgress?.percentage ?? 0.0;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -285,13 +297,15 @@ class _LessonPageState extends State<LessonPage> {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () {
-              Navigator.push(
+            onTap: () async {
+              await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => WordListScreen(topic: topic),
                 ),
               );
+              // Khi quay lại từ trang học, cập nhật lại tiến độ (không hiện loading full màn hình)
+              _fetchData(showLoading: false);
             },
             child: Padding(
               padding: const EdgeInsets.all(16),

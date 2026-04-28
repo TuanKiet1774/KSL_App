@@ -167,14 +167,6 @@ class _FeedbackPageState extends State<FeedbackPage> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Hãy cho chúng tôi biết cảm nhận của bạn để ứng dụng ngày càng hoàn thiện hơn',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 14,
-            ),
-          ),
         ],
       ),
     );

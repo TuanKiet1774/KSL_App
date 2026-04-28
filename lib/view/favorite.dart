@@ -368,8 +368,6 @@ class _FavoriteViewState extends State<FavoriteView> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(_searchQuery.isEmpty ? Icons.favorite_border_rounded : Icons.search_off_rounded, size: 80, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
           Text(_searchQuery.isEmpty ? 'Chưa có từ vựng yêu thích nào' : 'Không tìm thấy từ vựng nào khớp', style: const TextStyle(color: Colors.grey, fontSize: 16)),
         ],
       ),
