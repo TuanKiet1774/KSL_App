@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:ksl/component/appColors.dart';
 import 'package:ksl/model/learned_word.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:ksl/component/messDialog.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class LearnedWordDetailScreen extends StatefulWidget {
   final List<LearnedWordModel> learnedWords;
@@ -33,6 +37,13 @@ class _LearnedWordDetailScreenState extends State<LearnedWordDetailScreen> {
     super.dispose();
   }
 
+  Future<void> _launchYouTube(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (mounted) MessDialog.showErrorDialog(context, 'Lỗi', 'Không thể mở link YouTube');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -51,8 +62,7 @@ class _LearnedWordDetailScreenState extends State<LearnedWordDetailScreen> {
               return _buildWordContent(widget.learnedWords[index]);
             },
           ),
-          
-          // Custom Back Button
+
           Positioned(
             top: MediaQuery.of(context).padding.top + 10,
             left: 20,
@@ -104,6 +114,8 @@ class _LearnedWordDetailScreenState extends State<LearnedWordDetailScreen> {
     final word = learnedWord.wordId;
     if (word == null) return const Center(child: Text("Dữ liệu từ vựng không tồn tại"));
 
+    final bool hasYoutube = word.youtubeLink.isNotEmpty && YoutubePlayer.convertUrlToId(word.youtubeLink) != null;
+
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Padding(
@@ -114,63 +126,45 @@ class _LearnedWordDetailScreenState extends State<LearnedWordDetailScreen> {
             SizedBox(height: MediaQuery.of(context).padding.top + 100),
             
             // Media Section
-            if (word.media.url.isNotEmpty)
-              Center(
-                child: Container(
-                  width: MediaQuery.of(context).size.width * 0.85,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: AppColors.primaryTeal.withOpacity(0.3), width: 3),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(21),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        AspectRatio(
-                          aspectRatio: 1,
-                          child: Image.network(
-                            word.media.url,
-                            fit: BoxFit.cover,
-                            gaplessPlayback: true,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Center(
-                                child: CircularProgressIndicator(
-                                  value: loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                          loadingProgress.expectedTotalBytes!
-                                      : null,
-                                  color: AppColors.primaryTeal.withOpacity(0.5),
-                                ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(Icons.image_not_supported_rounded, size: 60, color: Colors.grey),
-                          ),
-                        ),
-                        if (word.media.type == 'video')
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.3),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 50),
-                          ),
-                      ],
+            Center(
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.85,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: AppColors.primaryTeal.withOpacity(0.3), width: 3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
                     ),
-                  ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(21),
+                    child: hasYoutube
+                      ? YoutubeFrame(videoUrl: word.youtubeLink)
+                      : (word.media.url.isNotEmpty
+                          ? AspectRatio(
+                              aspectRatio: 1,
+                              child: CachedNetworkImage(
+                                imageUrl: word.media.url,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => const Center(
+                                  child: CircularProgressIndicator(color: AppColors.primaryTeal),
+                                ),
+                                errorWidget: (context, url, error) => const Icon(
+                                  Icons.image_not_supported_rounded,
+                                  size: 60,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            )
+                          : const SizedBox(height: 200, child: Icon(Icons.image_not_supported_rounded, size: 60, color: Colors.grey))),
                 ),
               ),
+            ),
 
             const SizedBox(height: 40),
 
@@ -262,5 +256,75 @@ class _LearnedWordDetailScreenState extends State<LearnedWordDetailScreen> {
     } catch (e) {
       return date.toString();
     }
+  }
+}
+
+class YoutubeFrame extends StatefulWidget {
+  final String videoUrl;
+  const YoutubeFrame({super.key, required this.videoUrl});
+
+  @override
+  State<YoutubeFrame> createState() => _YoutubeFrameState();
+}
+
+class _YoutubeFrameState extends State<YoutubeFrame> {
+  late YoutubePlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final videoId = YoutubePlayer.convertUrlToId(widget.videoUrl);
+    _controller = YoutubePlayerController(
+      initialVideoId: videoId ?? '',
+      flags: const YoutubePlayerFlags(
+        autoPlay: false,
+        mute: false,
+        disableDragSeek: false,
+        loop: false,
+        isLive: false,
+        forceHD: false,
+        enableCaption: true,
+      ),
+    )..addListener(() {
+      if (mounted) {
+        if (_controller.value.playerState == PlayerState.ended) {
+          _controller.pause();
+        }
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.pause();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return YoutubePlayerBuilder(
+      player: YoutubePlayer(
+        controller: _controller,
+        showVideoProgressIndicator: true,
+        progressIndicatorColor: AppColors.primaryTeal,
+        progressColors: const ProgressBarColors(
+          playedColor: AppColors.primaryTeal,
+          handleColor: AppColors.primaryTeal,
+        ),
+        onEnded: (metaData) {
+          _controller.seekTo(Duration.zero);
+          _controller.pause();
+          if (mounted) setState(() {});
+        },
+      ),
+      builder: (context, player) {
+        return AspectRatio(
+          aspectRatio: 1,
+          child: player,
+        );
+      },
+    );
   }
 }

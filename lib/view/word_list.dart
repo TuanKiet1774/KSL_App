@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:ksl/component/appColors.dart';
 import 'package:ksl/controller/word_controller.dart';
 import 'package:ksl/controller/learned_word_controller.dart';
+import 'package:ksl/controller/favorite_word_controller.dart';
 import 'package:ksl/model/word.dart';
 import 'package:ksl/model/topic.dart';
 import 'package:ksl/component/loadingEffect.dart';
+import 'package:ksl/component/messDialog.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class WordListScreen extends StatefulWidget {
   final TopicModel topic;
@@ -123,6 +128,38 @@ class _WordListScreenState extends State<WordListScreen> {
       topicId: widget.topic.id,
       expGained: word.exp,
     );
+  }
+
+  Future<void> _toggleFavorite(WordModel word) async {
+    if (word.isFavorite) {
+      final result = await FavoriteWordController.removeFromFavorite(word.id);
+      if (result['success']) {
+        setState(() {
+          word.isFavorite = false;
+        });
+      } else {
+        if (mounted) MessDialog.showErrorDialog(context, 'Lỗi', result['message']);
+      }
+    } else {
+      final result = await FavoriteWordController.addToFavorite(
+        wordId: word.id,
+        topicId: widget.topic.id,
+      );
+      if (result['success']) {
+        setState(() {
+          word.isFavorite = true;
+        });
+      } else {
+        if (mounted) MessDialog.showErrorDialog(context, 'Lỗi', result['message']);
+      }
+    }
+  }
+
+  Future<void> _launchYouTube(String url) async {
+    final Uri uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (mounted) MessDialog.showErrorDialog(context, 'Lỗi', 'Không thể mở link YouTube');
+    }
   }
 
   void _nextPage() {
@@ -248,43 +285,40 @@ class _WordListScreenState extends State<WordListScreen> {
                     ],
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(21), // Trừ đi độ dày border để bo góc khớp
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        AspectRatio(
-                          aspectRatio: 1, // Để ảnh dạng hình vuông cân đối
-                          child: Image.network(
-                            word.media.url,
-                            fit: BoxFit.cover,
-                            gaplessPlayback: true,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Center(
-                                child: CircularProgressIndicator(
-                                  value: loadingProgress.expectedTotalBytes != null
-                                      ? loadingProgress.cumulativeBytesLoaded /
-                                          loadingProgress.expectedTotalBytes!
-                                      : null,
-                                  color: AppColors.primaryTeal.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(21),
+                    child: word.youtubeLink.isNotEmpty && YoutubePlayer.convertUrlToId(word.youtubeLink) != null
+                      ? YoutubeFrame(videoUrl: word.youtubeLink)
+                      : Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            AspectRatio(
+                              aspectRatio: 1,
+                              child: CachedNetworkImage(
+                                imageUrl: word.media.url,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Center(
+                                  child: CircularProgressIndicator(
+                                    color: AppColors.primaryTeal.withOpacity(0.5),
+                                  ),
                                 ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(Icons.image_not_supported_rounded, size: 60, color: Colors.grey),
-                          ),
-                        ),
-                        if (word.media.type == 'video')
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.3),
-                              shape: BoxShape.circle,
+                                errorWidget: (context, url, error) => const Icon(
+                                  Icons.image_not_supported_rounded,
+                                  size: 60,
+                                  color: Colors.grey,
+                                ),
+                              ),
                             ),
-                            child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 50),
-                          ),
-                      ],
-                    ),
+                            if (word.media.type == 'video')
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.3),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 50),
+                              ),
+                          ],
+                        ),
                   ),
                 ),
               ),
@@ -313,8 +347,17 @@ class _WordListScreenState extends State<WordListScreen> {
                     ],
                   ),
                 ),
-                Column(
+                Row(
                   children: [
+                    IconButton(
+                      icon: Icon(
+                        word.isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                        color: word.isFavorite ? Colors.red : Colors.grey,
+                        size: 32,
+                      ),
+                      onPressed: () => _toggleFavorite(word),
+                    ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
@@ -337,7 +380,6 @@ class _WordListScreenState extends State<WordListScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 12),
                   ],
                 ),
               ],
@@ -491,6 +533,76 @@ class _WordListScreenState extends State<WordListScreen> {
   Widget _buildEmptyState() {
     return const Center(
       child: Text('Chưa có từ vựng nào', style: TextStyle(color: Colors.grey)),
+    );
+  }
+}
+
+class YoutubeFrame extends StatefulWidget {
+  final String videoUrl;
+  const YoutubeFrame({super.key, required this.videoUrl});
+
+  @override
+  State<YoutubeFrame> createState() => _YoutubeFrameState();
+}
+
+class _YoutubeFrameState extends State<YoutubeFrame> {
+  late YoutubePlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final videoId = YoutubePlayer.convertUrlToId(widget.videoUrl);
+    _controller = YoutubePlayerController(
+      initialVideoId: videoId ?? '',
+      flags: const YoutubePlayerFlags(
+        autoPlay: false,
+        mute: false,
+        disableDragSeek: false,
+        loop: false,
+        isLive: false,
+        forceHD: false,
+        enableCaption: true,
+      ),
+    )..addListener(() {
+      if (mounted) {
+        if (_controller.value.playerState == PlayerState.ended) {
+          _controller.pause();
+        }
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.pause();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return YoutubePlayerBuilder(
+      player: YoutubePlayer(
+        controller: _controller,
+        showVideoProgressIndicator: true,
+        progressIndicatorColor: AppColors.primaryTeal,
+        progressColors: const ProgressBarColors(
+          playedColor: AppColors.primaryTeal,
+          handleColor: AppColors.primaryTeal,
+        ),
+        onEnded: (metaData) {
+          _controller.seekTo(Duration.zero);
+          _controller.pause();
+          if (mounted) setState(() {});
+        },
+      ),
+      builder: (context, player) {
+        return AspectRatio(
+          aspectRatio: 1,
+          child: player,
+        );
+      },
     );
   }
 }

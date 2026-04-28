@@ -24,12 +24,16 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
   bool _isSelectionMode = false;
   final Set<String> _selectedWordIds = {};
   
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
+
   // Phân trang
   final ScrollController _scrollController = ScrollController();
   int _currentPage = 1;
   bool _hasMore = true;
   bool _isFetchingMore = false;
-  final int _limit = 10;
+  final int _limit = 20;
 
   @override
   void initState() {
@@ -42,12 +46,13 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   void _onScroll() {
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      if (_hasMore && !_isFetchingMore && !_isLoading) {
+      if (_hasMore && !_isFetchingMore && !_isLoading && _searchQuery.isEmpty) {
         _fetchMoreLearnedWords();
       }
     }
@@ -56,7 +61,6 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
   Future<void> _syncUserExp() async {
     final result = await LearnedWordController.syncExp();
     if (mounted && result['success']) {
-      // AuthController.getProfile() sẽ tự động cập nhật userNotifier
       await AuthController.getProfile();
     }
   }
@@ -115,22 +119,49 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
     }
   }
 
+  List<LearnedWordModel> get _filteredWords {
+    if (_searchQuery.isEmpty) return _learnedWords;
+    return _learnedWords.where((w) {
+      final name = w.wordId?.name.toLowerCase() ?? "";
+      final topic = w.topicId?.name.toLowerCase() ?? "";
+      return name.contains(_searchQuery.toLowerCase()) || topic.contains(_searchQuery.toLowerCase());
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
-        title: Text(
-          _isSelectionMode ? 'Đã chọn ${_selectedWordIds.length}' : 'Từ vựng đã học',
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
+        title: _isSearching
+          ? TextField(
+              controller: _searchController,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                hintText: 'Tìm từ vựng đã học...',
+                hintStyle: TextStyle(color: Colors.white70),
+                border: InputBorder.none,
+              ),
+              onChanged: (value) => setState(() => _searchQuery = value),
+            )
+          : Text(
+              _isSelectionMode ? 'Đã chọn ${_selectedWordIds.length}' : 'Từ vựng đã học',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
         backgroundColor: AppColors.primaryTeal,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: Icon(_isSelectionMode ? Icons.close_rounded : Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          icon: Icon(_isSearching ? Icons.arrow_back_ios_new_rounded : (_isSelectionMode ? Icons.close_rounded : Icons.arrow_back_ios_new_rounded), color: Colors.white),
           onPressed: () {
-            if (_isSelectionMode) {
+            if (_isSearching) {
+              setState(() {
+                _isSearching = false;
+                _searchQuery = "";
+                _searchController.clear();
+              });
+            } else if (_isSelectionMode) {
               setState(() {
                 _isSelectionMode = false;
                 _selectedWordIds.clear();
@@ -141,7 +172,12 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
           },
         ),
         actions: [
-          if (_learnedWords.isNotEmpty)
+          if (!_isSearching && !_isSelectionMode && _learnedWords.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.search_rounded, color: Colors.white),
+              onPressed: () => setState(() => _isSearching = true),
+            ),
+          if (_learnedWords.isNotEmpty && !_isSearching)
             IconButton(
               icon: Icon(_isSelectionMode ? Icons.select_all_rounded : Icons.edit_note_rounded, color: Colors.white),
               onPressed: () {
@@ -171,9 +207,9 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
               ? _buildErrorState()
               : Column(
                   children: [
-                    _buildHeader(),
+                    if (!_isSearching) _buildHeader(),
                     Expanded(
-                      child: _learnedWords.isEmpty ? _buildEmptyState() : _buildLearnedWordList(),
+                      child: _filteredWords.isEmpty ? _buildEmptyState() : _buildLearnedWordList(),
                     ),
                   ],
                 ),
@@ -222,18 +258,19 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
   }
 
   Widget _buildLearnedWordList() {
+    final list = _filteredWords;
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-      itemCount: _learnedWords.length + (_hasMore ? 1 : 0),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+      itemCount: list.length + (_hasMore && _searchQuery.isEmpty ? 1 : 0),
       itemBuilder: (context, index) {
-        if (index == _learnedWords.length) {
+        if (index == list.length) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 20),
             child: Center(child: CircularProgressIndicator(color: AppColors.primaryTeal)),
           );
         }
-        final learned = _learnedWords[index];
+        final learned = list[index];
         return _buildDismissibleCard(learned, index);
       },
     );
@@ -288,12 +325,11 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
             }
           });
         } else {
-          // Xem chi tiết và cho phép lướt qua các từ khác
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => LearnedWordDetailScreen(
-                learnedWords: _learnedWords,
+                learnedWords: _filteredWords,
                 initialIndex: index,
               ),
             ),
@@ -411,11 +447,11 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
         setState(() {
           _learnedWords.removeAt(index);
         });
-        _syncUserExp(); // Đồng bộ lại EXP sau khi xóa
+        _syncUserExp();
         MessDialog.showSuccessDialog(context, 'Thành công', result['message']);
       } else {
         MessDialog.showErrorDialog(context, 'Lỗi', result['message']);
-        _fetchLearnedWords(); // Reload on failure
+        _fetchLearnedWords();
       }
     }
   }
@@ -433,7 +469,7 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
           _isSelectionMode = false;
           _isLoading = false;
         });
-        _syncUserExp(); // Đồng bộ lại EXP sau khi xóa hàng loạt
+        _syncUserExp();
         MessDialog.showSuccessDialog(context, 'Thành công', result['message']);
       } else {
         setState(() => _isLoading = false);
@@ -463,11 +499,11 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const SizedBox(height: 70),
-          Icon(Icons.menu_book_rounded, size: 80, color: Colors.grey.shade300),
+          Icon(_searchQuery.isEmpty ? Icons.menu_book_rounded : Icons.search_off_rounded, size: 80, color: Colors.grey.shade300),
           const SizedBox(height: 16),
-          const Text(
-            'Bạn chưa học từ vựng nào',
-            style: TextStyle(color: Colors.grey, fontSize: 16),
+          Text(
+            _searchQuery.isEmpty ? 'Bạn chưa học từ vựng nào' : 'Không tìm thấy từ vựng nào khớp',
+            style: const TextStyle(color: Colors.grey, fontSize: 16),
           ),
         ],
       ),
