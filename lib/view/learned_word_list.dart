@@ -498,8 +498,6 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(height: 70),
-          Icon(_searchQuery.isEmpty ? Icons.menu_book_rounded : Icons.search_off_rounded, size: 80, color: Colors.grey.shade300),
           const SizedBox(height: 16),
           Text(
             _searchQuery.isEmpty ? 'Bạn chưa học từ vựng nào' : 'Không tìm thấy từ vựng nào khớp',
