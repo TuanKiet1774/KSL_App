@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
@@ -18,6 +19,9 @@ class AuthController {
           'emailOrUsername': username,
           'password': password,
         }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('Kết nối quá hạn (30s). Server có thể đang khởi động lại, vui lòng thử lại.'),
       );
 
       final data = jsonDecode(response.body);
@@ -32,13 +36,15 @@ class AuthController {
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Đăng nhập thất bại',
+          'message': data['message'] ?? 'Đăng nhập thất bại (${response.statusCode})',
         };
       }
     } catch (e) {
+      // In ra lỗi thực sự để debug
+      debugPrint('[AuthController.login] ERROR: $e');
       return {
         'success': false,
-        'message': 'Không thể kết nối đến server. Vui lòng thử lại.',
+        'message': 'Lỗi kết nối: ${e.toString()}',
       };
     }
   }
@@ -53,7 +59,6 @@ class AuthController {
     String? gender,
     String? birthday,
     String? address,
-    String? level,
   }) async {
     try {
       final response = await http.post(
@@ -68,7 +73,6 @@ class AuthController {
           'gender': gender,
           'birthday': birthday,
           'address': address,
-          'level': level,
         }),
       );
 

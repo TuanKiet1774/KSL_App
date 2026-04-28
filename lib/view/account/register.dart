@@ -30,7 +30,6 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   String _selectedGender = "Nam";
-  String _selectedLevel = "Beginner";
   DateTime? _selectedBirthday;
 
   late AnimationController _animController;
@@ -115,7 +114,6 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
       gender: _selectedGender,
       birthday: _selectedBirthday?.toIso8601String(),
       address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
-      level: _selectedLevel,
     );
 
     if (!mounted) return;

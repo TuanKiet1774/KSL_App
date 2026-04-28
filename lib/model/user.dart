@@ -8,7 +8,6 @@ class UserModel {
   final String avatar;
   final String birthday;
   final String address;
-  final String level;
   final String gender;
   final int exp;
   final String accessToken;
@@ -24,7 +23,6 @@ class UserModel {
     required this.avatar,
     required this.birthday,
     required this.address,
-    required this.level,
     required this.gender,
     required this.exp,
     required this.accessToken,
@@ -42,7 +40,6 @@ class UserModel {
       avatar: json['avatar'] ?? '',
       birthday: json['birthday'] ?? '',
       address: json['address'] ?? '',
-      level: json['level'] ?? '',
       gender: json['gender'] ?? '',
       exp: json['exp'] ?? 0,
       accessToken: json['accessToken'] ?? json['mobileSessionToken'] ?? '',
@@ -61,7 +58,6 @@ class UserModel {
       'avatar': avatar,
       'birthday': birthday,
       'address': address,
-      'level': level,
       'gender': gender,
       'exp': exp,
       'accessToken': accessToken,
