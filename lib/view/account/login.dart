@@ -273,7 +273,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           const SizedBox(height: 16),
           _buildTextField(
             controller: _usernameController,
-            label: 'Tên đăng nhập / Email',
+            label: 'Tên đăng nhập',
             icon: Icons.person_outline_rounded,
             validator: (value) {
               if (value == null || value.trim().isEmpty) return 'Vui lòng nhập tài khoản';
