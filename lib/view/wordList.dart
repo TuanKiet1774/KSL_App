@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ksl/component/appColors.dart';
 import 'package:ksl/controller/wordController.dart';
+import 'package:ksl/controller/progressController.dart';
 import 'package:ksl/controller/learnedWordController.dart';
 import 'package:ksl/controller/favoriteWordController.dart';
 import 'package:ksl/model/word.dart';
@@ -34,6 +35,8 @@ class _WordListScreenState extends State<WordListScreen> {
   final int _threshold = 5; 
   bool _hasMore = true;
   bool _isFetchingMore = false;
+  
+  final DateTime _sessionStartTime = DateTime.now();
 
   @override
   void initState() {
@@ -165,6 +168,14 @@ class _WordListScreenState extends State<WordListScreen> {
     }
   }
 
+  Future<void> _recordLearningTime() async {
+    final int minutes = DateTime.now().difference(_sessionStartTime).inMinutes;
+    // Chỉ ghi nhận nếu thời gian học ít nhất là 1 phút
+    if (minutes > 0) {
+      await ProgressController.updateLearningTime(minutes);
+    }
+  }
+
   Future<void> _markAsLearned(int index) async {
     if (index >= _visibleWords.length) return;
     final word = _visibleWords[index];
@@ -228,54 +239,61 @@ class _WordListScreenState extends State<WordListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
-                    : _errorMessage.isNotEmpty
-                        ? _buildErrorState()
-                        : _visibleWords.isEmpty
-                            ? _buildEmptyState()
-                            : _buildWordPageView(),
-              ),
-              if (!_isLoading && _visibleWords.isNotEmpty) _buildNavigationControls(),
-            ],
-          ),
-
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 10,
-            left: 20,
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                child: const Icon(Icons.arrow_back_ios, color: AppColors.primaryBlue, size: 24),
-              ),
+    return PopScope(
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) {
+          await _recordLearningTime();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
+          children: [
+            Column(
+              children: [
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
+                      : _errorMessage.isNotEmpty
+                          ? _buildErrorState()
+                          : _visibleWords.isEmpty
+                              ? _buildEmptyState()
+                              : _buildWordPageView(),
+                ),
+                if (!_isLoading && _visibleWords.isNotEmpty) _buildNavigationControls(),
+              ],
             ),
-          ),
-
-          if (!_isLoading && _visibleWords.isNotEmpty)
+  
             Positioned(
-              top: MediaQuery.of(context).padding.top + 22,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  '${_currentIndex + 1} / ${_visibleWords.length}${_hasMore ? '+' : ''}',
-                  style: const TextStyle(
-                    color: AppColors.primaryBlue,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+              top: MediaQuery.of(context).padding.top + 10,
+              left: 20,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  child: const Icon(Icons.arrow_back_ios, color: AppColors.primaryBlue, size: 24),
                 ),
               ),
             ),
-        ],
+  
+            if (!_isLoading && _visibleWords.isNotEmpty)
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 22,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Text(
+                    '${_currentIndex + 1} / ${_visibleWords.length}${_hasMore ? '+' : ''}',
+                    style: const TextStyle(
+                      color: AppColors.primaryBlue,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

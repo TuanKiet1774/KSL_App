@@ -529,6 +529,11 @@ class _StatisticsViewState extends State<StatisticsView> {
 
   Widget _buildTopicProgressSection() {
     final topics = _progressData?.topicProgress ?? [];
+    if (topics.isEmpty) return _buildEmptyTopicsPlaceholder();
+
+    final double screenWidth = MediaQuery.of(context).size.width - 40;
+    final double barWidth = 85.0;
+    final double chartWidth = topics.length > 4 ? topics.length * barWidth : screenWidth;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -545,87 +550,150 @@ class _StatisticsViewState extends State<StatisticsView> {
           ),
         ),
         const SizedBox(height: 16),
-        topics.isEmpty 
-        ? _buildEmptyTopicsPlaceholder()
-        : ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: topics.length,
-          itemBuilder: (context, index) {
-            final topic = topics[index];
-            final percent = topic.percentage;
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+        Container(
+          height: 320,
+          padding: const EdgeInsets.fromLTRB(10, 24, 10, 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          topic.topicName.isNotEmpty ? topic.topicName : 'Chủ đề #${index + 1}',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primaryBlue,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Text(
-                        '${percent.toInt()}%',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primaryTeal,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      value: percent / 100,
-                      minHeight: 8,
-                      backgroundColor: Colors.grey.shade100,
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryTeal),
+            ],
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: SizedBox(
+              width: chartWidth,
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: 100,
+                  barTouchData: BarTouchData(
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (_) => AppColors.primaryBlue,
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        return BarTooltipItem(
+                          '${topics[groupIndex].topicName}\n',
+                          const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                          children: [
+                            TextSpan(
+                              text: '${rod.toY.toInt()}%',
+                              style: const TextStyle(color: AppColors.accentOrange, fontSize: 14, fontWeight: FontWeight.w900),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Icon(Icons.menu_book_rounded, size: 14, color: Colors.grey.shade400),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Đã học ${topic.learnedWordsCount} từ',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade500,
-                          fontWeight: FontWeight.w500,
-                        ),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 80,
+                        getTitlesWidget: (value, meta) {
+                          int index = value.toInt();
+                          if (index >= 0 && index < topics.length) {
+                            String name = topics[index].topicName;
+                            if (name.length > 12) name = '${name.substring(0, 10)}...';
+                            return SideTitleWidget(
+                              meta: meta,
+                              space: 10,
+                              child: Transform.rotate(
+                                angle: -0.4,
+                                child: Container(
+                                  constraints: const BoxConstraints(maxWidth: 70),
+                                  child: Text(
+                                    name,
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
                       ),
-                    ],
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        interval: 25,
+                        getTitlesWidget: (value, meta) {
+                          return Text(
+                            '${value.toInt()}%',
+                            style: TextStyle(color: Colors.grey.shade400, fontSize: 10),
+                          );
+                        },
+                      ),
+                    ),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   ),
-                ],
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: 25,
+                    getDrawingHorizontalLine: (value) => FlLine(
+                      color: Colors.grey.shade50,
+                      strokeWidth: 1,
+                    ),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  barGroups: List.generate(topics.length, (index) {
+                    final percent = topics[index].percentage;
+                    final List<Color> availableColors = [
+                      AppColors.primaryTeal,
+                      const Color(0xFF5AD7F3),
+                      const Color(0xFFFFA585),
+                      const Color(0xFFFF7EB3),
+                      const Color(0xFF70F570),
+                      const Color(0xFF4FACFE),
+                      const Color(0xFFF093FB),
+                    ];
+                    final color = availableColors[index % availableColors.length];
+
+                    return BarChartGroupData(
+                      x: index,
+                      barRods: [
+                        BarChartRodData(
+                          toY: percent,
+                          gradient: LinearGradient(
+                            colors: [
+                              color,
+                              color.withOpacity(0.6),
+                            ],
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                          ),
+                          width: 22,
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                          backDrawRodData: BackgroundBarChartRodData(
+                            show: true,
+                            toY: 100,
+                            color: Colors.grey.shade50,
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
               ),
-            );
-          },
+            ),
+          ),
         ),
       ],
     );
