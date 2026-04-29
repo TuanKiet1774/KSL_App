@@ -7,6 +7,7 @@ import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/model/learnedWord.dart';
 import 'package:ksl/view/learnedWordDetail.dart';
 import 'package:ksl/controller/authController.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../component/loadingEffect.dart';
 
@@ -441,9 +442,16 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
   }
 
   Future<void> _deleteSingleWord(String id, int index) async {
+    final learned = _learnedWords[index];
     final result = await LearnedWordController.deleteLearnedWord(id);
     if (mounted) {
       if (result['success']) {
+        // Xóa luôn vết (reset index về 0) cho topic của từ này
+        if (learned.topicId != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove('last_index_${learned.topicId!.id}');
+        }
+        
         setState(() {
           _learnedWords.removeAt(index);
         });
@@ -463,6 +471,18 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
     
     if (mounted) {
       if (result['success']) {
+        // Reset vết học cho tất cả topic có trong danh sách xóa
+        final prefs = await SharedPreferences.getInstance();
+        final deletedTopics = _learnedWords
+            .where((w) => _selectedWordIds.contains(w.id))
+            .map((w) => w.topicId?.id)
+            .whereType<String>()
+            .toSet();
+        
+        for (var topicId in deletedTopics) {
+          await prefs.remove('last_index_$topicId');
+        }
+
         setState(() {
           _learnedWords.removeWhere((w) => _selectedWordIds.contains(w.id));
           _selectedWordIds.clear();

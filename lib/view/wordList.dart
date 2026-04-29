@@ -495,6 +495,7 @@ class _WordListScreenState extends State<WordListScreen> {
               onTap: () async {
                 if (_currentIndex == _visibleWords.length - 1 && !_hasMore) {
                   await _markAsLearned(_currentIndex);
+                  await _saveLastIndex(0); // Đã hoàn thành thì không cần lưu vết (về 0)
                   Navigator.pop(context);
                 } else {
                   _nextPage();
