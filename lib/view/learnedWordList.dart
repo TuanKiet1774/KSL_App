@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/learned_word_controller.dart';
+import 'package:ksl/controller/learnedWordController.dart';
 import 'package:ksl/component/confirmDialog.dart';
 import 'package:ksl/component/messDialog.dart';
-import 'package:ksl/model/learned_word.dart';
-import 'package:ksl/view/learned_word_detail.dart';
-import 'package:ksl/controller/auth_controller.dart';
+import 'package:ksl/model/learnedWord.dart';
+import 'package:ksl/view/learnedWordDetail.dart';
+import 'package:ksl/controller/authController.dart';
 
 import '../component/loadingEffect.dart';
 

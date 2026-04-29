@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:ksl/connectDB/api.dart';
-import 'package:ksl/controller/auth_controller.dart';
-import 'package:ksl/model/favorite_word.dart';
+import 'package:ksl/controller/authController.dart';
+import 'package:ksl/model/favoriteWord.dart';
 
 class FavoriteWordController {
   /// Thêm từ vựng vào danh sách yêu thích

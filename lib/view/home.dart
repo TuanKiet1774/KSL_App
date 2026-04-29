@@ -7,12 +7,12 @@ import 'package:ksl/view/favorite.dart';
 import 'package:ksl/view/translate.dart';
 import 'package:ksl/view/settings.dart';
 import 'package:ksl/view/infomation.dart';
-import 'package:ksl/view/topic_list.dart';
+import 'package:ksl/view/topicList.dart';
 
 import 'package:ksl/component/confirmDialog.dart';
 import 'package:ksl/component/avatar.dart';
 import 'package:ksl/model/user.dart';
-import 'package:ksl/controller/auth_controller.dart';
+import 'package:ksl/controller/authController.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});

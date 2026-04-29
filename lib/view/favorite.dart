@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/favorite_word_controller.dart';
+import 'package:ksl/controller/favoriteWordController.dart';
 import 'package:ksl/model/word.dart';
-import 'package:ksl/model/favorite_word.dart';
+import 'package:ksl/model/favoriteWord.dart';
 import 'package:ksl/component/loadingEffect.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/component/confirmDialog.dart';

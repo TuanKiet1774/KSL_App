@@ -1,8 +1,8 @@
-import 'package:ksl/controller/topic_controller.dart';
-import 'package:ksl/controller/learned_word_controller.dart';
-import 'package:ksl/controller/auth_controller.dart';
+import 'package:ksl/controller/topicController.dart';
+import 'package:ksl/controller/learnedWordController.dart';
+import 'package:ksl/controller/authController.dart';
 
-import '../controller/word_controller.dart';
+import '../controller/wordController.dart';
 
 class BackgroundPrefetcher {
   static Future<void> start() async {

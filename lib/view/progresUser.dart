@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/progress_controller.dart';
+import 'package:ksl/controller/progressController.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import 'package:ksl/model/progress.dart';
+
+import '../model/progress.dart';
 
 class StatisticsView extends StatefulWidget {
   const StatisticsView({super.key});

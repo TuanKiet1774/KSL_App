@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/topic_controller.dart';
-import 'package:ksl/controller/progress_controller.dart';
+import 'package:ksl/controller/topicController.dart';
+import 'package:ksl/controller/progressController.dart';
 import 'package:ksl/model/topic.dart';
 import 'package:ksl/component/lazyLoading.dart';
-import 'package:ksl/view/word_list.dart';
-
+import 'package:ksl/view/wordList.dart';
+import 'package:ksl/component/messDialog.dart';
 import '../model/progress.dart';
 
 class LessonPage extends StatefulWidget {
@@ -105,8 +105,20 @@ class _LessonPageState extends State<LessonPage> {
       return matchesSearch && matchesLevel;
     }).toList();
 
-    // Mặc định sắp xếp theo thứ tự bảng chữ cái
-    filtered.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    // Sắp xếp: Ưu tiên các topic đã mở (đủ EXP), sau đó sắp xếp theo bảng chữ cái
+    final int userExp = _userProgress?.stats.totalExp ?? 0;
+    filtered.sort((a, b) {
+      final bool aLocked = userExp < a.expRequired;
+      final bool bLocked = userExp < b.expRequired;
+      
+      // Nếu trạng thái khóa khác nhau, đưa topic không bị khóa lên trước
+      if (aLocked != bLocked) {
+        return aLocked ? 1 : -1;
+      }
+      
+      // Nếu cùng trạng thái khóa, sắp xếp theo bảng chữ cái
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
 
     return filtered;
   }
@@ -278,15 +290,19 @@ class _LessonPageState extends State<LessonPage> {
     }
     
     final double percentage = topicProgress?.percentage ?? 0.0;
+    
+    // Kiểm tra topic có bị khóa hay không
+    final int userExp = _userProgress?.stats.totalExp ?? 0;
+    final bool isLocked = userExp < topic.expRequired;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isLocked ? Colors.grey.shade50 : Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withOpacity(isLocked ? 0.01 : 0.04),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -297,66 +313,110 @@ class _LessonPageState extends State<LessonPage> {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => WordListScreen(topic: topic),
-                ),
-              );
-              // Khi quay lại từ trang học, cập nhật lại tiến độ (không hiện loading full màn hình)
-              _fetchData(showLoading: false);
-            },
+            onTap: isLocked 
+              ? () {
+                  MessDialog.showInfoDialog(
+                    context, 
+                    'Chủ đề chưa mở', 
+                    'Bạn cần ${topic.expRequired} EXP để mở chủ đề này! (Hiện có: $userExp)'
+                  );
+                }
+              : () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => WordListScreen(topic: topic),
+                    ),
+                  );
+                  _fetchData(showLoading: false);
+                },
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      color: AppColors.backgroundCream,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: topic.image != ""
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(16),
-                            child: Image.network(
-                              topic.image,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(Icons.image_not_supported_rounded, color: Colors.grey),
+                  Stack(
+                    children: [
+                      Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          color: AppColors.backgroundCream,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: topic.image != ""
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(16),
+                                child: ColorFiltered(
+                                  colorFilter: isLocked 
+                                    ? const ColorFilter.mode(Colors.grey, BlendMode.saturation)
+                                    : const ColorFilter.mode(Colors.transparent, BlendMode.multiply),
+                                  child: Image.network(
+                                    topic.image,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        const Icon(Icons.image_not_supported_rounded, color: Colors.grey),
+                                  ),
+                                ),
+                              )
+                            : Icon(
+                                Icons.topic_rounded, 
+                                size: 40, 
+                                color: isLocked ? Colors.grey : AppColors.primaryTeal
+                              ),
+                      ),
+                      if (isLocked)
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(16),
                             ),
-                          )
-                        : const Icon(Icons.topic_rounded, size: 40, color: AppColors.primaryTeal),
+                            child: const Icon(Icons.lock_rounded, color: Colors.white, size: 30),
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _getLevelColor(topic.level).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            topic.level,
-                            style: TextStyle(
-                              color: _getLevelColor(topic.level),
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: (isLocked ? Colors.grey : _getLevelColor(topic.level)).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                topic.level,
+                                style: TextStyle(
+                                  color: isLocked ? Colors.grey : _getLevelColor(topic.level),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ),
+                            if (isLocked)
+                              Text(
+                                '${topic.expRequired} EXP',
+                                style: const TextStyle(
+                                  color: Colors.orange,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         Text(
                           topic.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.primaryBlue,
+                            color: isLocked ? Colors.grey : AppColors.primaryBlue,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -364,7 +424,7 @@ class _LessonPageState extends State<LessonPage> {
                         const SizedBox(height: 4),
                         Text(
                           topic.description,
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                          style: TextStyle(fontSize: 12, color: isLocked ? Colors.grey.shade400 : Colors.grey.shade500),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -375,7 +435,9 @@ class _LessonPageState extends State<LessonPage> {
                               child: LinearProgressIndicator(
                                 value: percentage / 100,
                                 backgroundColor: Colors.grey.shade100,
-                                valueColor: AlwaysStoppedAnimation<Color>(_getLevelColor(topic.level)),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  isLocked ? Colors.grey.shade300 : _getLevelColor(topic.level)
+                                ),
                                 minHeight: 6,
                                 borderRadius: BorderRadius.circular(10),
                               ),
@@ -386,7 +448,7 @@ class _LessonPageState extends State<LessonPage> {
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: _getLevelColor(topic.level),
+                                color: isLocked ? Colors.grey : _getLevelColor(topic.level),
                               ),
                             ),
                           ],

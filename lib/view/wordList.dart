@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/word_controller.dart';
-import 'package:ksl/controller/learned_word_controller.dart';
-import 'package:ksl/controller/favorite_word_controller.dart';
+import 'package:ksl/controller/wordController.dart';
+import 'package:ksl/controller/learnedWordController.dart';
+import 'package:ksl/controller/favoriteWordController.dart';
 import 'package:ksl/model/word.dart';
 import 'package:ksl/model/topic.dart';
 import 'package:ksl/component/loadingEffect.dart';
@@ -10,6 +10,7 @@ import 'package:ksl/component/messDialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class WordListScreen extends StatefulWidget {
   final TopicModel topic;
@@ -37,7 +38,13 @@ class _WordListScreenState extends State<WordListScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchWords();
+    _initData();
+  }
+
+  Future<void> _initData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final int savedIndex = prefs.getInt('last_index_${widget.topic.id}') ?? 0;
+    await _fetchWords(targetIndex: savedIndex);
   }
 
   @override
@@ -46,7 +53,9 @@ class _WordListScreenState extends State<WordListScreen> {
     super.dispose();
   }
 
-  Future<void> _fetchWords() async {
+  Future<void> _fetchWords({int targetIndex = 0}) async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
       _errorMessage = "";
@@ -56,32 +65,68 @@ class _WordListScreenState extends State<WordListScreen> {
       _hasMore = true;
     });
 
-    final result = await WordController.getWordsByTopic(widget.topic.id, page: _currentPage, limit: _batchSize);
-
-    if (mounted) {
-      if (result['success']) {
-        final List<WordModel> newWords = result['data'];
-        _visibleWords = newWords;
-        
-        if (newWords.length < _batchSize) {
-          _hasMore = false;
+    bool success = false;
+    // Load các batch cho đến khi đạt được targetIndex hoặc hết dữ liệu
+    while (_visibleWords.length <= targetIndex && _hasMore) {
+      final result = await WordController.getWordsByTopic(widget.topic.id, page: _currentPage, limit: _batchSize);
+      
+      if (mounted) {
+        if (result['success']) {
+          final List<WordModel> newWords = result['data'];
+          if (newWords.isEmpty) {
+            _hasMore = false;
+            break;
+          }
+          
+          _visibleWords.addAll(newWords);
+          
+          if (newWords.length < _batchSize) {
+            _hasMore = false;
+          } else {
+            _currentPage++;
+          }
+          success = true;
         } else {
-          _hasMore = true;
+          setState(() {
+            _errorMessage = result['message'];
+            _isLoading = false;
+          });
+          return;
         }
-
-        // Tải ảnh ngầm, không đợi xong hết mới hiện UI
-        _precacheImages(_visibleWords);
-        
-        setState(() {
-          _isLoading = false;
-        });
       } else {
-        setState(() {
-          _errorMessage = result['message'];
-          _isLoading = false;
+        return;
+      }
+    }
+
+    if (mounted && success) {
+      // Đảm bảo targetIndex không vượt quá số từ hiện có
+      if (targetIndex >= _visibleWords.length) {
+        targetIndex = _visibleWords.isEmpty ? 0 : _visibleWords.length - 1;
+      }
+
+      _currentIndex = targetIndex;
+      
+      // Tải ảnh ngầm cho batch hiện tại
+      _precacheImages(_visibleWords);
+      
+      setState(() {
+        _isLoading = false;
+      });
+
+      // Jump to page sau khi UI build xong
+      if (targetIndex > 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(targetIndex);
+          }
         });
       }
     }
+  }
+
+  Future<void> _saveLastIndex(int index) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('last_index_${widget.topic.id}', index);
   }
 
   void _precacheImages(List<WordModel> words) {
@@ -246,6 +291,7 @@ class _WordListScreenState extends State<WordListScreen> {
         setState(() {
           _currentIndex = index;
         });
+        _saveLastIndex(index);
         if (_visibleWords.length - index <= _threshold) {
           _loadNextBatch();
         }

@@ -1,11 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:ksl/connectDB/api.dart';
-import 'package:ksl/controller/auth_controller.dart';
-import 'package:ksl/model/word.dart';
+import 'package:ksl/controller/authController.dart';
+import 'package:ksl/model/progress.dart';
 
-class WordController {
-  static Future<Map<String, dynamic>> getWordsByTopic(String topicId, {int page = 1, int limit = 10}) async {
+class ProgressController {
+  /// Lấy thông tin tiến độ và thống kê của người dùng
+  static Future<Map<String, dynamic>> getUserProgress() async {
     try {
       final token = await AuthController.getAccessToken();
       if (token == null) {
@@ -13,7 +14,7 @@ class WordController {
       }
 
       final response = await http.get(
-        Uri.parse('$urlAPI/api/words?topicId=$topicId&page=$page&limit=$limit&sortBy=name&sortOrder=asc'),
+        Uri.parse('$urlAPI/api/progress'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -23,23 +24,20 @@ class WordController {
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
-        final List<dynamic> wordJson = data['data'];
-        final List<WordModel> words = wordJson.map((json) => WordModel.fromJson(json)).toList();
-        
         return {
           'success': true,
-          'data': words
+          'data': ProgressModel.fromJson(data['data'])
         };
       } else {
         return {
           'success': false,
-          'message': data['message'] ?? 'Không thể lấy danh sách từ vựng'
+          'message': data['message'] ?? 'Không thể lấy thông tin thống kê'
         };
       }
     } catch (e) {
       return {
         'success': false,
-        'message': 'Lỗi kết nối server: $e'
+        'message': 'Lỗi kết nối server'
       };
     }
   }

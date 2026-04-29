@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ksl/component/appColors.dart';
 import 'package:ksl/component/messDialog.dart';
-import 'package:ksl/controller/auth_controller.dart';
-import 'package:ksl/controller/feedback_controller.dart';
+import 'package:ksl/controller/authController.dart';
+import 'package:ksl/controller/feedbackController.dart';
 import 'package:intl/intl.dart';
 import 'package:ksl/model/feedback.dart';
 
