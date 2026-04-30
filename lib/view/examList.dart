@@ -297,23 +297,10 @@ class _ExamListPageState extends State<ExamListPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.assignment_late_outlined, size: 80, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
           const Text(
             'Không tìm thấy bài thi nào',
             style: TextStyle(color: Colors.grey, fontSize: 16),
           ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _fetchExams,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryTeal,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Tải lại', style: TextStyle(fontWeight: FontWeight.bold)),
-          )
         ],
       ),
     );

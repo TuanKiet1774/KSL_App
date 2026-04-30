@@ -174,7 +174,19 @@ class _StatisticsViewState extends State<StatisticsView> {
     final streak = _progressData?.stats.streakDays ?? 0;
     final totalWordsLearned = _progressData?.stats.totalWordsLearned ?? 0;
     final totalExp = _progressData?.stats.totalExp ?? 0;
-    final totalLearningMinutes = _progressData?.stats.totalLearningMinutes ?? 0.0;
+    
+    double todayLearningMinutes = 0;
+    final now = DateTime.now();
+    final todayStr = DateFormat('dd/MM/yyyy').format(now);
+    
+    for (var item in (_progressData?.accessHistory ?? [])) {
+      try {
+        final sessionDate = DateTime.parse(item.sessionStart);
+        if (DateFormat('dd/MM/yyyy').format(sessionDate) == todayStr) {
+          todayLearningMinutes += item.duration;
+        }
+      } catch (_) {}
+    }
 
     return Column(
       children: [
@@ -216,8 +228,8 @@ class _StatisticsViewState extends State<StatisticsView> {
             const SizedBox(width: 16),
             Expanded(
               child: _premiumStatCard(
-                title: 'Thời gian học',
-                value: totalLearningMinutes.toStringAsFixed(0),
+                title: 'Học hôm nay',
+                value: todayLearningMinutes.toStringAsFixed(0),
                 unit: 'phút',
                 icon: Icons.timer_rounded,
                 colors: [const Color(0xFF84FAB0), const Color(0xFF8FD3F4)],
@@ -322,8 +334,6 @@ class _StatisticsViewState extends State<StatisticsView> {
         children: [
           const Row(
             children: [
-              Icon(Icons.analytics_rounded, color: AppColors.primaryTeal, size: 24),
-              SizedBox(width: 12),
               Text(
                 'Điểm kiểm tra trung bình',
                 style: TextStyle(
@@ -381,20 +391,18 @@ class _StatisticsViewState extends State<StatisticsView> {
 
   Widget _buildActivityChart() {
     final history = _progressData?.accessHistory ?? [];
-    
-    // Gom nhóm thời gian theo ngày
+  
     Map<String, double> dailyStats = {};
     for (var item in history) {
       try {
         DateTime date = DateTime.parse(item.sessionStart);
         String formattedDate = DateFormat('dd/MM').format(date);
-        double duration = item.duration.toDouble();
-        dailyStats[formattedDate] = (dailyStats[formattedDate] ?? 0) + duration;
+        double durationMinutes = item.duration;
+        dailyStats[formattedDate] = (dailyStats[formattedDate] ?? 0) + durationMinutes;
       } catch (_) {}
     }
 
     final sortedDates = dailyStats.keys.toList();
-    // Lấy tối đa 7 ngày gần nhất
     final displayDates = sortedDates.length > 7 
         ? sortedDates.sublist(sortedDates.length - 7) 
         : sortedDates;
@@ -425,7 +433,7 @@ class _StatisticsViewState extends State<StatisticsView> {
           ),
           const SizedBox(height: 8),
           Text(
-            displayDates.isEmpty ? 'Chưa có dữ liệu hoạt động' : 'Thống kê tổng số giây học tập mỗi ngày',
+            displayDates.isEmpty ? 'Chưa có dữ liệu hoạt động' : 'Thống kê thời gian học gần đây',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey.shade500,
@@ -499,7 +507,7 @@ class _StatisticsViewState extends State<StatisticsView> {
                     getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
                       return touchedBarSpots.map((barSpot) {
                         return LineTooltipItem(
-                          '${barSpot.y.toInt()} giây',
+                          '${barSpot.y.toStringAsFixed(1)} phút',
                           const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                         );
                       }).toList();
@@ -530,10 +538,6 @@ class _StatisticsViewState extends State<StatisticsView> {
     final topics = _progressData?.topicProgress ?? [];
     if (topics.isEmpty) return _buildEmptyTopicsPlaceholder();
 
-    final double screenWidth = MediaQuery.of(context).size.width - 40;
-    final double barWidth = 85.0;
-    final double chartWidth = topics.length > 4 ? topics.length * barWidth : screenWidth;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -550,8 +554,8 @@ class _StatisticsViewState extends State<StatisticsView> {
         ),
         const SizedBox(height: 16),
         Container(
-          height: 320,
-          padding: const EdgeInsets.fromLTRB(10, 24, 10, 10),
+          height: 350, // Kích thước cố định cho khung tiến trình
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(32),
@@ -563,140 +567,110 @@ class _StatisticsViewState extends State<StatisticsView> {
               ),
             ],
           ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+          child: ListView.separated(
             physics: const BouncingScrollPhysics(),
-            child: SizedBox(
-              width: chartWidth,
-              child: BarChart(
-                BarChartData(
-                  alignment: BarChartAlignment.spaceAround,
-                  maxY: 100,
-                  barTouchData: BarTouchData(
-                    touchTooltipData: BarTouchTooltipData(
-                      getTooltipColor: (_) => AppColors.primaryBlue,
-                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                        return BarTooltipItem(
-                          '${topics[groupIndex].topicName}\n',
-                          const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                          children: [
-                            TextSpan(
-                              text: '${rod.toY.toInt()}%',
-                              style: const TextStyle(color: AppColors.accentOrange, fontSize: 14, fontWeight: FontWeight.w900),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  titlesData: FlTitlesData(
-                    show: true,
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 80,
-                        getTitlesWidget: (value, meta) {
-                          int index = value.toInt();
-                          if (index >= 0 && index < topics.length) {
-                            String name = topics[index].topicName;
-                            if (name.length > 12) name = '${name.substring(0, 10)}...';
-                            return SideTitleWidget(
-                              meta: meta,
-                              space: 10,
-                              child: Transform.rotate(
-                                angle: -0.4,
-                                child: Container(
-                                  constraints: const BoxConstraints(maxWidth: 70),
-                                  child: Text(
-                                    name,
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      ),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 40,
-                        interval: 25,
-                        getTitlesWidget: (value, meta) {
-                          return Text(
-                            '${value.toInt()}%',
-                            style: TextStyle(color: Colors.grey.shade400, fontSize: 10),
-                          );
-                        },
-                      ),
-                    ),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  ),
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: 25,
-                    getDrawingHorizontalLine: (value) => FlLine(
-                      color: Colors.grey.shade50,
-                      strokeWidth: 1,
-                    ),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  barGroups: List.generate(topics.length, (index) {
-                    final percent = topics[index].percentage;
-                    final List<Color> availableColors = [
-                      AppColors.primaryTeal,
-                      const Color(0xFF5AD7F3),
-                      const Color(0xFFFFA585),
-                      const Color(0xFFFF7EB3),
-                      const Color(0xFF70F570),
-                      const Color(0xFF4FACFE),
-                      const Color(0xFFF093FB),
-                    ];
-                    final color = availableColors[index % availableColors.length];
-
-                    return BarChartGroupData(
-                      x: index,
-                      barRods: [
-                        BarChartRodData(
-                          toY: percent,
-                          gradient: LinearGradient(
-                            colors: [
-                              color,
-                              color.withOpacity(0.6),
-                            ],
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                          ),
-                          width: 22,
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-                          backDrawRodData: BackgroundBarChartRodData(
-                            show: true,
-                            toY: 100,
-                            color: Colors.grey.shade50,
-                          ),
-                        ),
-                      ],
-                    );
-                  }),
-                ),
-              ),
-            ),
+            itemCount: topics.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 20),
+            itemBuilder: (context, index) {
+              final topic = topics[index];
+              final List<Color> availableColors = [
+                AppColors.primaryTeal,
+                const Color(0xFF5AD7F3),
+                const Color(0xFFFFA585),
+                const Color(0xFFFF7EB3),
+                const Color(0xFF70F570),
+                const Color(0xFF4FACFE),
+                const Color(0xFFF093FB),
+              ];
+              final color = availableColors[index % availableColors.length];
+              
+              return _buildHorizontalProgressBar(topic, color);
+            },
           ),
         ),
       ],
     );
   }
+
+  Widget _buildHorizontalProgressBar(TopicProgressModel topic, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                topic.topicName,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primaryBlue,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${topic.percentage.toInt()}%',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Stack(
+          children: [
+            Container(
+              height: 10,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return Container(
+                  height: 10,
+                  width: constraints.maxWidth * (topic.percentage / 100),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [color, color.withOpacity(0.7)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withOpacity(0.2),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Đã học: ${topic.learnedWordsCount} từ',
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey.shade500,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
 
   Widget _buildEmptyTopicsPlaceholder() {
     return Container(

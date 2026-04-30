@@ -403,8 +403,6 @@ class _ExamHistoryPageState extends State<ExamHistoryPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.history_rounded, size: 80, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
           Text(
             'Bạn chưa tham gia bài thi nào',
             style: TextStyle(color: Colors.grey.shade500, fontSize: 16, fontWeight: FontWeight.bold),

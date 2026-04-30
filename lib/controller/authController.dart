@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ksl/connectDB/api.dart';
 import 'package:ksl/model/user.dart';
+import 'package:ksl/controller/progressController.dart';
 
 class AuthController {
   static final ValueNotifier<UserModel?> userNotifier = ValueNotifier<UserModel?>(null);
@@ -103,6 +104,9 @@ class AuthController {
     
     // Cập nhật notifier để giao diện thay đổi realtime
     userNotifier.value = user;
+
+    // Bắt đầu phiên làm việc mới
+    ProgressController.startSession();
   }
 
   static Future<bool> isLoggedIn() async {
@@ -266,6 +270,9 @@ class AuthController {
 
   /// Đăng xuất
   static Future<void> logout() async {
+    // Kết thúc phiên làm việc trước khi đăng xuất
+    await ProgressController.endSession();
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
   }

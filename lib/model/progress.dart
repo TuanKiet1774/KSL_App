@@ -186,7 +186,7 @@ class TopicProgressModel {
 class AccessHistoryModel {
   final String sessionStart;
   final String? sessionEnd;
-  final int duration;
+  final double duration;
 
   AccessHistoryModel({
     required this.sessionStart,
@@ -196,12 +196,12 @@ class AccessHistoryModel {
 
   factory AccessHistoryModel.fromJson(Map<String, dynamic>? json) {
     if (json == null) {
-      return AccessHistoryModel(sessionStart: '', duration: 0);
+      return AccessHistoryModel(sessionStart: '', duration: 0.0);
     }
     return AccessHistoryModel(
       sessionStart: json['sessionStart']?.toString() ?? '',
       sessionEnd: json['sessionEnd']?.toString(),
-      duration: (json['duration'] as num? ?? 0).toInt(),
+      duration: (json['duration'] as num? ?? 0.0).toDouble(),
     );
   }
 
