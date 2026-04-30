@@ -12,6 +12,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ksl/component/youtubeFrame.dart';
 
 class WordListScreen extends StatefulWidget {
   final TopicModel topic;
@@ -351,7 +352,7 @@ class _WordListScreenState extends State<WordListScreen> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(21),
                     child: word.youtubeLink.isNotEmpty && YoutubePlayer.convertUrlToId(word.youtubeLink) != null
-                      ? YoutubeFrame(videoUrl: word.youtubeLink)
+                      ? YoutubeFrame(videoUrl: word.youtubeLink, aspectRatio: 1)
                       : Stack(
                           alignment: Alignment.center,
                           children: [
@@ -602,72 +603,3 @@ class _WordListScreenState extends State<WordListScreen> {
   }
 }
 
-class YoutubeFrame extends StatefulWidget {
-  final String videoUrl;
-  const YoutubeFrame({super.key, required this.videoUrl});
-
-  @override
-  State<YoutubeFrame> createState() => _YoutubeFrameState();
-}
-
-class _YoutubeFrameState extends State<YoutubeFrame> {
-  late YoutubePlayerController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    final videoId = YoutubePlayer.convertUrlToId(widget.videoUrl);
-    _controller = YoutubePlayerController(
-      initialVideoId: videoId ?? '',
-      flags: const YoutubePlayerFlags(
-        autoPlay: false,
-        mute: false,
-        disableDragSeek: false,
-        loop: false,
-        isLive: false,
-        forceHD: false,
-        enableCaption: true,
-      ),
-    )..addListener(() {
-      if (mounted) {
-        if (_controller.value.playerState == PlayerState.ended) {
-          _controller.pause();
-        }
-        setState(() {});
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.pause();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return YoutubePlayerBuilder(
-      player: YoutubePlayer(
-        controller: _controller,
-        showVideoProgressIndicator: true,
-        progressIndicatorColor: AppColors.primaryTeal,
-        progressColors: const ProgressBarColors(
-          playedColor: AppColors.primaryTeal,
-          handleColor: AppColors.primaryTeal,
-        ),
-        onEnded: (metaData) {
-          _controller.seekTo(Duration.zero);
-          _controller.pause();
-          if (mounted) setState(() {});
-        },
-      ),
-      builder: (context, player) {
-        return AspectRatio(
-          aspectRatio: 1,
-          child: player,
-        );
-      },
-    );
-  }
-}

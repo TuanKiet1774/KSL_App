@@ -8,6 +8,7 @@ import 'package:ksl/view/translate.dart';
 import 'package:ksl/view/settings.dart';
 import 'package:ksl/view/infomation.dart';
 import 'package:ksl/view/topicList.dart';
+import 'package:ksl/view/examList.dart';
 
 import 'package:ksl/component/confirmDialog.dart';
 import 'package:ksl/component/avatar.dart';
@@ -283,7 +284,12 @@ class HomeMainContent extends StatelessWidget {
                   _buildCategoryButton(
                     title: 'Bài thi',
                     assetPath: 'assets/BaiThi.png',
-                    onTap: () {},
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const ExamListPage()),
+                      );
+                    },
                   ),
                 ],
               ),

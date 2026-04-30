@@ -179,7 +179,7 @@ class _FavoriteViewState extends State<FavoriteView> {
             ),
           if (_isSelectionMode && _selectedWordIds.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+              icon: const Icon(Icons.delete_sweep_rounded, color: Colors.white),
               onPressed: _showBulkDeleteConfirmation,
             ),
         ],

@@ -62,26 +62,28 @@ class _StatisticsViewState extends State<StatisticsView> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-            onPressed: _fetchData,
+      ),
+      body: Column(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: _isLoading
+                ? _buildLoadingState()
+                : _errorMessage != null
+                    ? _buildErrorState()
+                    : RefreshIndicator(
+                        onRefresh: _fetchData,
+                        color: AppColors.primaryTeal,
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
+                          child: _buildContent(),
+                        ),
+                      ),
           ),
         ],
       ),
-      body: _isLoading
-          ? _buildLoadingState()
-          : _errorMessage != null
-              ? _buildErrorState()
-              : SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: Column(
-                    children: [
-                      _buildHeader(),
-                      _buildContent(),
-                    ],
-                  ),
-                ),
     );
   }
 
@@ -144,11 +146,8 @@ class _StatisticsViewState extends State<StatisticsView> {
   }
 
   Widget _buildLoadingState() {
-    return SizedBox(
-      height: MediaQuery.of(context).size.height * 0.7,
-      child: const Center(
-        child: CircularProgressIndicator(color: AppColors.primaryTeal),
-      ),
+    return const Center(
+      child: CircularProgressIndicator(color: AppColors.primaryTeal),
     );
   }
 

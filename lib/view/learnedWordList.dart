@@ -197,7 +197,7 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
             ),
           if (_isSelectionMode && _selectedWordIds.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+              icon: const Icon(Icons.delete_sweep_rounded, color: Colors.white),
               onPressed: _showBulkDeleteConfirmation,
             ),
         ],
@@ -471,7 +471,6 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
     
     if (mounted) {
       if (result['success']) {
-        // Reset vết học cho tất cả topic có trong danh sách xóa
         final prefs = await SharedPreferences.getInstance();
         final deletedTopics = _learnedWords
             .where((w) => _selectedWordIds.contains(w.id))

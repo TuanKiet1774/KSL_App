@@ -10,6 +10,7 @@ import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/view/feedback.dart';
 import 'package:ksl/view/progresUser.dart';
 import 'package:ksl/view/learnedWordList.dart';
+import 'package:ksl/view/examHistory.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -212,7 +213,12 @@ class _SettingsViewState extends State<SettingsView> {
           _buildMenuItem(
             icon: Icons.history_rounded,
             title: 'Lịch sử bài thi',
-            onTap: () {},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ExamHistoryPage()),
+              );
+            },
           ),
           _buildDivider(),
           _buildMenuItem(
