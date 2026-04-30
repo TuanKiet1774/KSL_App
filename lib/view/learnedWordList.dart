@@ -195,25 +195,69 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
                 });
               },
             ),
-          if (_isSelectionMode && _selectedWordIds.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.delete_sweep_rounded, color: Colors.white),
-              onPressed: _showBulkDeleteConfirmation,
-            ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
           : _errorMessage.isNotEmpty
               ? _buildErrorState()
-              : Column(
+              : Stack(
                   children: [
-                    if (!_isSearching) _buildHeader(),
-                    Expanded(
-                      child: _filteredWords.isEmpty ? _buildEmptyState() : _buildLearnedWordList(),
+                    Column(
+                      children: [
+                        if (!_isSearching) _buildHeader(),
+                        Expanded(
+                          child: _filteredWords.isEmpty ? _buildEmptyState() : _buildLearnedWordList(),
+                        ),
+                      ],
                     ),
+                    if (_isSelectionMode && _selectedWordIds.isNotEmpty)
+                      Positioned(
+                        left: 20,
+                        right: 20,
+                        bottom: 30,
+                        child: _buildBottomDeleteAction(),
+                      ),
                   ],
                 ),
+    );
+  }
+
+  Widget _buildBottomDeleteAction() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Đã chọn ${_selectedWordIds.length} mục',
+              style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryBlue),
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: _showBulkDeleteConfirmation,
+            icon: const Icon(Icons.delete_sweep_rounded, color: Colors.white),
+            label: const Text('Xóa'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

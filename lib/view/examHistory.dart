@@ -274,7 +274,7 @@ class _ExamHistoryPageState extends State<ExamHistoryPage> {
               final examResult = await ExamController.getExamById(result.examId);
               
               if (mounted) {
-                Navigator.pop(context); // Đóng loading
+                Navigator.pop(context);
 
                 if (examResult['success']) {
                   final exam = examResult['data'] as ExamModel;
