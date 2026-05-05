@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:ksl/view/account/login.dart';
 import 'package:ksl/component/appColors.dart';
+import 'package:ksl/view/splash.dart';
 import 'package:ksl/controller/authController.dart';
 import 'package:ksl/controller/progressController.dart';
-import 'package:ksl/view/home.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   PaintingBinding.instance.imageCache.maximumSizeBytes = 1024 * 1024 * 150;
+  
+  // Kiểm tra đăng nhập và bắt đầu session ngay từ đầu nếu đã login
   final isLoggedIn = await AuthController.isLoggedIn();
   if (isLoggedIn) {
     ProgressController.startSession();
@@ -24,20 +25,10 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
-  bool _isLoggedIn = false;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _checkLoginStatus();
-  }
-
-  Future<void> _checkLoginStatus() async {
-    final status = await AuthController.isLoggedIn();
-    setState(() {
-      _isLoggedIn = status;
-    });
   }
 
   @override
@@ -71,7 +62,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         scaffoldBackgroundColor: AppColors.backgroundCream,
         useMaterial3: true,
       ),
-      home: _isLoggedIn ? const HomePage() : const LoginPage(),
+      home: const SplashView(),
     );
   }
 }

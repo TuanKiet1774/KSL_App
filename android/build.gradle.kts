@@ -22,3 +22,17 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+
+subprojects {
+    plugins.withId("com.android.library") {
+        if (project.name == "mediapipe_task_vision") {
+            val android = project.extensions.getByName("android")
+            try {
+                val setNamespace = android.javaClass.getMethod("setNamespace", String::class.java)
+                setNamespace.invoke(android, "org.tensorflow.mediapipe.task.mediapipe_task_vision")
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
+    }
+}
