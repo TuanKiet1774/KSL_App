@@ -11,6 +11,7 @@ import 'package:ksl/component/confirmDialog.dart';
 import 'package:ksl/component/youtubeFrame.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:ksl/view/examResult.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ExamQuizPage extends StatefulWidget {
   final ExamModel exam;
@@ -361,16 +362,47 @@ class _ExamQuizPageState extends State<ExamQuizPage> {
                     ),
                   ),
                   const SizedBox(width: 15),
-                  Expanded(
-                    child: Text(
-                      option.content,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected ? Colors.white : AppColors.textDark,
+                  if (option.media.url.isNotEmpty) ...[
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? Colors.white.withOpacity(0.5) : Colors.grey.shade200,
+                          width: 1,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: CachedNetworkImage(
+                          imageUrl: option.media.url,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryTeal),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => const Icon(Icons.image_not_supported_rounded, color: Colors.grey),
+                        ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 15),
+                  ],
+                  if (option.content.isNotEmpty)
+                    Expanded(
+                      child: Text(
+                        option.content,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? Colors.white : AppColors.textDark,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

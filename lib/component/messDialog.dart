@@ -3,7 +3,7 @@ import 'package:ksl/component/appColors.dart';
 
 class MessDialog {
   /// Hiển thị thông báo thành công
-  static void showSuccessDialog(BuildContext context, String title, String message, {VoidCallback? onConfirm}) {
+  static void showSuccessDialog(BuildContext context, String title, String message, {VoidCallback? onConfirm, TextAlign textAlign = TextAlign.center}) {
     _buildDialog(
       context,
       title,
@@ -11,11 +11,12 @@ class MessDialog {
       Icons.check_circle,
       Colors.green.shade600,
       onConfirm: onConfirm,
+      textAlign: textAlign,
     );
   }
 
   /// Hiển thị thông báo lỗi
-  static void showErrorDialog(BuildContext context, String title, String message, {VoidCallback? onConfirm}) {
+  static void showErrorDialog(BuildContext context, String title, String message, {VoidCallback? onConfirm, TextAlign textAlign = TextAlign.center}) {
     _buildDialog(
       context,
       title,
@@ -23,11 +24,12 @@ class MessDialog {
       Icons.error,
       Colors.red.shade600,
       onConfirm: onConfirm,
+      textAlign: textAlign,
     );
   }
 
   /// Hiển thị thông báo thông tin chung
-  static void showInfoDialog(BuildContext context, String title, String message, {VoidCallback? onConfirm}) {
+  static void showInfoDialog(BuildContext context, String title, String message, {VoidCallback? onConfirm, TextAlign textAlign = TextAlign.center}) {
     _buildDialog(
       context,
       title,
@@ -35,6 +37,7 @@ class MessDialog {
       Icons.info,
       Colors.blue.shade600,
       onConfirm: onConfirm,
+      textAlign: textAlign,
     );
   }
 
@@ -46,6 +49,7 @@ class MessDialog {
     IconData icon,
     Color color, {
     VoidCallback? onConfirm,
+    TextAlign textAlign = TextAlign.center,
   }) {
     showDialog(
       context: context,
@@ -57,7 +61,7 @@ class MessDialog {
           ),
           elevation: 0,
           backgroundColor: Colors.transparent,
-          child: _contentBox(context, title, message, icon, color, onConfirm),
+          child: _contentBox(context, title, message, icon, color, onConfirm, textAlign),
         );
       },
     );
@@ -70,6 +74,7 @@ class MessDialog {
     IconData icon,
     Color color,
     VoidCallback? onConfirm,
+    TextAlign textAlign,
   ) {
     return Stack(
       children: <Widget>[
@@ -112,7 +117,7 @@ class MessDialog {
                   fontSize: 16,
                   color: Colors.black87,
                 ),
-                textAlign: TextAlign.center,
+                textAlign: textAlign,
               ),
               const SizedBox(height: 25),
               SizedBox(

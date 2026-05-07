@@ -62,14 +62,14 @@ class _WordListScreenState extends State<WordListScreen> {
       _errorMessage = "";
       _visibleWords = [];
       _currentIndex = 0;
-      _currentPage = 1;
+      _currentPage = 0;
       _hasMore = true;
     });
 
     bool success = false;
     // Load các batch cho đến khi đạt được targetIndex hoặc hết dữ liệu
     while (_visibleWords.length <= targetIndex && _hasMore) {
-      final result = await WordController.getWordsByTopic(widget.topic.id, page: _currentPage, limit: _batchSize);
+      final result = await WordController.getWordsByTopic(widget.topic.id, page: _currentPage + 1, limit: _batchSize);
       
       if (mounted) {
         if (result['success']) {

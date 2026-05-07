@@ -153,7 +153,6 @@ class _ExamListPageState extends State<ExamListPage> {
           color: Colors.transparent,
           child: InkWell(
             onTap: () async {
-              // Hiển thị loading dialog
               showDialog(
                 context: context,
                 barrierDismissible: false,
@@ -171,29 +170,25 @@ class _ExamListPageState extends State<ExamListPage> {
                     return;
                   }
 
-                  // Kiểm tra xem người dùng đã học các chủ đề này chưa
                   final progressResult = await ProgressController.getUserProgress();
                   
                   if (mounted) {
-                    Navigator.pop(context); // Đóng loading
+                    Navigator.pop(context); 
 
                     if (progressResult['success']) {
                       final progress = progressResult['data'] as ProgressModel;
                       
-                      // Lấy danh sách các topic ID có trong bài thi
                       final examTopicIds = fullExam.questions
                           .map((q) => q.topicId)
                           .where((id) => id.isNotEmpty)
                           .toSet();
                       
-                      // Kiểm tra xem người dùng đã hoàn thành 100% tất cả các topic trong bài thi chưa
                       bool allTopicsCompleted = true;
                       List<String> uncompletedTopics = [];
 
                       for (var topicId in examTopicIds) {
-                        // Tìm tiến độ của topic này trong dữ liệu người dùng
                         final topicProg = progress.topicProgress.firstWhere(
-                          (tp) => tp.topicId == topicId,
+                          (tp) => tp.topicId.toString().trim() == topicId.toString().trim(),
                           orElse: () => TopicProgressModel(
                             topicId: topicId, 
                             topicName: 'Chủ đề chưa học', 
@@ -203,17 +198,22 @@ class _ExamListPageState extends State<ExamListPage> {
                           ),
                         );
 
-                        if (topicProg.percentage < 100) {
+                        if (topicProg.percentage < 99.9) {
                           allTopicsCompleted = false;
                           uncompletedTopics.add(topicProg.topicName);
                         }
                       }
 
                       if (!allTopicsCompleted && examTopicIds.isNotEmpty) {
+                        // Liệt kê các chủ đề chưa xong xuống dòng với dấu gạch đầu dòng
+                        String topicsStr = uncompletedTopics.take(5).map((e) => '- $e').join('\n');
+                        if (uncompletedTopics.length > 5) topicsStr += '\n- ...';
+                        
                         MessDialog.showInfoDialog(
                           context, 
                           'Chú ý',
-                          'Bạn cần hoàn thiện các chủ đề liên quan trước khi làm bài kiểm tra này'
+                          'Bạn cần hoàn thiện 100% các chủ đề liên quan trước khi làm bài kiểm tra này.\n\nCác chủ đề chưa xong:\n$topicsStr',
+                          textAlign: TextAlign.left,
                         );
                         return;
                       }
