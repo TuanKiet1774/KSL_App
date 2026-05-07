@@ -110,6 +110,13 @@ class ProgressController {
         }),
       );
 
+      // Nếu token không hợp lệ (hết hạn hoặc bị logout từ thiết bị khác)
+      if (response.statusCode == 401) {
+        final data = jsonDecode(response.body);
+        AuthController.handleSessionExpired(data['message'] ?? 'Phiên đăng nhập đã kết thúc do tài khoản được đăng nhập ở thiết bị khác.');
+        return {'success': false, 'message': 'Session expired'};
+      }
+
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {

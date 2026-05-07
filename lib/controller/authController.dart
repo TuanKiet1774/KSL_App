@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ksl/connectDB/api.dart';
 import 'package:ksl/model/user.dart';
 import 'package:ksl/controller/progressController.dart';
+import 'package:ksl/component/navigator_key.dart';
+import 'package:ksl/view/account/login.dart';
+import 'package:ksl/component/messDialog.dart';
 
 class AuthController {
   static final ValueNotifier<UserModel?> userNotifier = ValueNotifier<UserModel?>(null);
@@ -143,6 +147,14 @@ class AuthController {
         },
       );
 
+      // Nếu token không hợp lệ (hết hạn hoặc bị logout từ thiết bị khác)
+      if (response.statusCode == 401) {
+        final data = jsonDecode(response.body);
+        final message = data['message'] ?? 'Phiên đăng nhập đã hết hạn hoặc tài khoản đang được sử dụng ở thiết bị khác.';
+        handleSessionExpired(message);
+        return {'success': false, 'message': message};
+      }
+
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
@@ -150,9 +162,15 @@ class AuthController {
         await _saveUserData(user); // Cập nhật dữ liệu mới nhất
         return {'success': true, 'user': user};
       } else {
+        // Kiểm tra message cụ thể từ backend nếu có
+        final message = data['message'] ?? 'Không thể lấy thông tin cá nhân';
+        if (message.toString().contains('đăng nhập ở thiết bị khác') || 
+            message.toString().contains('phiên làm việc đã kết thúc')) {
+          handleSessionExpired(message);
+        }
         return {
           'success': false,
-          'message': data['message'] ?? 'Không thể lấy thông tin cá nhân',
+          'message': message,
         };
       }
     } catch (e) {
@@ -275,5 +293,60 @@ class AuthController {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
+  }
+
+  /// Kiểm tra xem session còn hiệu lực không
+  static Future<void> checkSessionValidity() async {
+    final token = await getAccessToken();
+    if (token == null) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$urlAPI/api/auth/profile'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 401) {
+        final data = jsonDecode(response.body);
+        handleSessionExpired(data['message'] ?? 'Tài khoản của bạn đã được đăng nhập ở một thiết bị khác.');
+      } else if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == false && (data['message']?.toString().contains('thiết bị khác') ?? false)) {
+          handleSessionExpired(data['message']);
+        }
+      }
+    } catch (e) {
+      debugPrint('[AuthController.checkSessionValidity] ERROR: $e');
+    }
+  }
+
+ 
+  static void handleSessionExpired(String message) async {
+    if (userNotifier.value == null && !(await isLoggedIn())) return;
+
+    await logout();
+    
+    final context = navigatorKey.currentContext;
+    if (context != null) {
+      MessDialog.showErrorDialog(
+        context,
+        'Thông báo hệ thống',
+        message,
+        onConfirm: () {
+          navigatorKey.currentState?.pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const LoginPage()),
+            (route) => false,
+          );
+        },
+      );
+    } else {
+      navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+        (route) => false,
+      );
+    }
   }
 }

@@ -3,6 +3,7 @@ import 'package:ksl/component/appColors.dart';
 import 'package:ksl/view/splash.dart';
 import 'package:ksl/controller/authController.dart';
 import 'package:ksl/controller/progressController.dart';
+import 'package:ksl/component/navigator_key.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,6 +48,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       AuthController.isLoggedIn().then((isLoggedIn) {
         if (isLoggedIn) {
           ProgressController.startSession();
+          // Kiểm tra session còn hiệu lực hay không (đăng nhập ở thiết bị khác?)
+          AuthController.checkSessionValidity();
         }
       });
     }
@@ -55,6 +58,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'KSL App',
       theme: ThemeData(
