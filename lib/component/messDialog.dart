@@ -41,7 +41,6 @@ class MessDialog {
     );
   }
 
-  /// Lõi xây dựng giao diện chung cho Dialog modal
   static void _buildDialog(
     BuildContext context,
     String title,
@@ -53,7 +52,7 @@ class MessDialog {
   }) {
     showDialog(
       context: context,
-      barrierDismissible: false, // Yêu cầu người dùng nhấn nút Đóng để thoát
+      barrierDismissible: false, 
       builder: (BuildContext context) {
         return Dialog(
           shape: RoundedRectangleBorder(
@@ -81,11 +80,11 @@ class MessDialog {
         Container(
           padding: const EdgeInsets.only(
             left: 20,
-            top: 60, // Chừa không gian cho icon đè lên trên
+            top: 60,
             right: 20,
             bottom: 20,
           ),
-          margin: const EdgeInsets.only(top: 45), // Lệch xuống để chừa không gian cho icon
+          margin: const EdgeInsets.only(top: 45), 
           decoration: BoxDecoration(
             shape: BoxShape.rectangle,
             color: Colors.white,
@@ -99,7 +98,7 @@ class MessDialog {
             ],
           ),
           child: Column(
-            mainAxisSize: MainAxisSize.min, // Wrap content theo nội dung chữ
+            mainAxisSize: MainAxisSize.min, 
             children: <Widget>[
               Text(
                 title,
