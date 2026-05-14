@@ -46,118 +46,120 @@ class _ProfilePageState extends State<ProfilePage> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(32),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Header with Gradient
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppColors.primaryBlue, AppColors.primaryTeal],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header with Gradient
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppColors.primaryBlue, AppColors.primaryTeal],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(32),
+                        topRight: Radius.circular(32),
+                      ),
                     ),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(32),
-                      topRight: Radius.circular(32),
+                    child: const Center(
+                      child: Icon(Icons.lock_person_rounded, color: Colors.white, size: 48),
                     ),
                   ),
-                  child: const Center(
-                    child: Icon(Icons.lock_person_rounded, color: Colors.white, size: 48),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Xác minh danh tính',
-                        style: TextStyle(
-                          color: AppColors.primaryBlue,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Vui lòng nhập mật khẩu để tiếp tục.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 14, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 24),
-                      TextField(
-                        controller: passwordController,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          hintText: 'Mật khẩu',
-                          filled: true,
-                          fillColor: AppColors.backgroundCream.withOpacity(0.5),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Xác minh danh tính',
+                          style: TextStyle(
+                            color: AppColors.primaryBlue,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextButton(
-                              onPressed: isVerifying ? null : () => Navigator.pop(context),
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              ),
-                              child: const Text('Hủy', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Vui lòng nhập mật khẩu để tiếp tục.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 24),
+                        TextField(
+                          controller: passwordController,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            hintText: 'Mật khẩu',
+                            filled: true,
+                            fillColor: AppColors.backgroundCream.withOpacity(0.5),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: isVerifying
-                                  ? null
-                                  : () async {
-                                      if (passwordController.text.isEmpty) return;
-                                      setDialogState(() => isVerifying = true);
-                                      
-                                      final result = await AuthController.login(_user!.username, passwordController.text);
-                                      
-                                      if (mounted) {
-                                        setDialogState(() => isVerifying = false);
-                                        if (result['success'] == true) {
-                                          Navigator.pop(context); 
-                                          final editResult = await Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => EditProfilePage(user: _user!),
-                                            ),
-                                          );
-                                          if (editResult == true) {
-                                            _fetchProfile();
+                        ),
+                        const SizedBox(height: 32),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextButton(
+                                onPressed: isVerifying ? null : () => Navigator.pop(context),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                ),
+                                child: const Text('Hủy', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: isVerifying
+                                    ? null
+                                    : () async {
+                                        if (passwordController.text.isEmpty) return;
+                                        setDialogState(() => isVerifying = true);
+                                        
+                                        final result = await AuthController.login(_user!.username, passwordController.text);
+                                        
+                                        if (mounted) {
+                                          setDialogState(() => isVerifying = false);
+                                          if (result['success'] == true) {
+                                            Navigator.pop(context); 
+                                            final editResult = await Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) => EditProfilePage(user: _user!),
+                                              ),
+                                            );
+                                            if (editResult == true) {
+                                              _fetchProfile();
+                                            }
+                                          } else {
+                                            MessDialog.showErrorDialog(context, 'Lỗi xác minh', 'Mật khẩu không chính xác.');
                                           }
-                                        } else {
-                                          MessDialog.showErrorDialog(context, 'Lỗi xác minh', 'Mật khẩu không chính xác.');
                                         }
-                                      }
-                                    },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primaryTeal,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                      },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primaryTeal,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                ),
+                                child: isVerifying
+                                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                    : const Text('Xác nhận', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                               ),
-                              child: isVerifying
-                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                  : const Text('Xác nhận', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -333,191 +335,193 @@ class _ProfilePageState extends State<ProfilePage> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(32),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Header with Gradient
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppColors.primaryBlue, AppColors.primaryTeal],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header with Gradient
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppColors.primaryBlue, AppColors.primaryTeal],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(32),
+                        topRight: Radius.circular(32),
+                      ),
                     ),
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(32),
-                      topRight: Radius.circular(32),
+                    child: Center(
+                      child: Icon(
+                        currentStep == 1 ? Icons.lock_outline_rounded : currentStep == 2 ? Icons.person_search_rounded : Icons.vpn_key_rounded,
+                        color: Colors.white,
+                        size: 48,
+                      ),
                     ),
                   ),
-                  child: Center(
-                    child: Icon(
-                      currentStep == 1 ? Icons.lock_outline_rounded : currentStep == 2 ? Icons.person_search_rounded : Icons.vpn_key_rounded,
-                      color: Colors.white,
-                      size: 48,
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    children: [
-                      Text(
-                        currentStep == 1 ? 'Xác thực' : currentStep == 2 ? 'Thông tin tài khoản' : 'Đổi mật khẩu mới',
-                        style: const TextStyle(
-                          color: AppColors.primaryBlue,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        Text(
+                          currentStep == 1 ? 'Xác thực' : currentStep == 2 ? 'Thông tin tài khoản' : 'Đổi mật khẩu mới',
+                          style: const TextStyle(
+                            color: AppColors.primaryBlue,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      LinearProgressIndicator(
-                        value: currentStep / 3,
-                        backgroundColor: AppColors.primaryTeal.withOpacity(0.1),
-                        valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryTeal),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      const SizedBox(height: 24),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(minHeight: 160),
-                        child: Column(
-                          children: [
-                            if (currentStep == 1) ...[
-                              const Text('Nhập mật khẩu hiện tại để tiếp tục.', style: TextStyle(fontSize: 14, color: Colors.grey)),
-                              const SizedBox(height: 16),
-                              TextField(
-                                controller: currentPasswordController,
-                                obscureText: true,
-                                decoration: _buildDialogInputDecoration('Mật khẩu hiện tại', Icons.lock_rounded),
-                              ),
-                            ] else if (currentStep == 2) ...[
-                              const Text('Xác nhận thông tin tài khoản của bạn.', style: TextStyle(fontSize: 14, color: Colors.grey)),
-                              const SizedBox(height: 16),
-                              TextField(
-                                controller: usernameController,
-                                decoration: _buildDialogInputDecoration('Username', Icons.person_rounded),
-                              ),
-                              const SizedBox(height: 12),
-                              TextField(
-                                controller: emailController,
-                                decoration: _buildDialogInputDecoration('Email', Icons.email_rounded),
-                              ),
-                            ] else ...[
-                              const Text('Thiết lập mật khẩu mới cho tài khoản.', style: TextStyle(fontSize: 14, color: Colors.grey)),
-                              const SizedBox(height: 16),
-                              TextField(
-                                controller: newPasswordController,
-                                obscureText: true,
-                                decoration: _buildDialogInputDecoration('Mật khẩu mới', Icons.new_releases_rounded),
-                              ),
-                              const SizedBox(height: 12),
-                              TextField(
-                                controller: confirmPasswordController,
-                                obscureText: true,
-                                decoration: _buildDialogInputDecoration('Xác nhận mật khẩu mới', Icons.check_circle_rounded),
-                              ),
+                        const SizedBox(height: 12),
+                        LinearProgressIndicator(
+                          value: currentStep / 3,
+                          backgroundColor: AppColors.primaryTeal.withOpacity(0.1),
+                          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryTeal),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        const SizedBox(height: 24),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 160),
+                          child: Column(
+                            children: [
+                              if (currentStep == 1) ...[
+                                const Text('Nhập mật khẩu hiện tại để tiếp tục.', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                                const SizedBox(height: 16),
+                                TextField(
+                                  controller: currentPasswordController,
+                                  obscureText: true,
+                                  decoration: _buildDialogInputDecoration('Mật khẩu hiện tại', Icons.lock_rounded),
+                                ),
+                              ] else if (currentStep == 2) ...[
+                                const Text('Xác nhận thông tin tài khoản của bạn.', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                                const SizedBox(height: 16),
+                                TextField(
+                                  controller: usernameController,
+                                  decoration: _buildDialogInputDecoration('Username', Icons.person_rounded),
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: emailController,
+                                  decoration: _buildDialogInputDecoration('Email', Icons.email_rounded),
+                                ),
+                              ] else ...[
+                                const Text('Thiết lập mật khẩu mới cho tài khoản.', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                                const SizedBox(height: 16),
+                                TextField(
+                                  controller: newPasswordController,
+                                  obscureText: true,
+                                  decoration: _buildDialogInputDecoration('Mật khẩu mới', Icons.new_releases_rounded),
+                                ),
+                                const SizedBox(height: 12),
+                                TextField(
+                                  controller: confirmPasswordController,
+                                  obscureText: true,
+                                  decoration: _buildDialogInputDecoration('Xác nhận mật khẩu mới', Icons.check_circle_rounded),
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextButton(
-                              onPressed: isLoading
-                                  ? null
-                                  : () {
-                                      if (currentStep > 1) {
-                                        setDialogState(() => currentStep--);
-                                      } else {
-                                        Navigator.pop(context);
-                                      }
-                                    },
-                              style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              ),
-                              child: Text(
-                                currentStep > 1 ? 'Quay lại' : 'Hủy',
-                                style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+                        const SizedBox(height: 32),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextButton(
+                                onPressed: isLoading
+                                    ? null
+                                    : () {
+                                        if (currentStep > 1) {
+                                          setDialogState(() => currentStep--);
+                                        } else {
+                                          Navigator.pop(context);
+                                        }
+                                      },
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                ),
+                                child: Text(
+                                  currentStep > 1 ? 'Quay lại' : 'Hủy',
+                                  style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: isLoading
-                                  ? null
-                                  : () async {
-                                      if (currentStep < 3) {
-                                        if (currentStep == 1) {
-                                          if (currentPasswordController.text.isEmpty) return;
-                                          
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: isLoading
+                                    ? null
+                                    : () async {
+                                        if (currentStep < 3) {
+                                          if (currentStep == 1) {
+                                            if (currentPasswordController.text.isEmpty) return;
+                                            
+                                            setDialogState(() => isLoading = true);
+                                            final result = await AuthController.login(_user!.username, currentPasswordController.text);
+                                            
+                                            if (mounted) {
+                                              setDialogState(() => isLoading = false);
+                                              if (result['success'] == true) {
+                                                setDialogState(() => currentStep++);
+                                              } else {
+                                                MessDialog.showErrorDialog(context, 'Lỗi xác minh', 'Mật khẩu hiện tại không chính xác.');
+                                              }
+                                            }
+                                          } else if (currentStep == 2) {
+                                            if (usernameController.text.isEmpty || emailController.text.isEmpty) return;
+                                            
+                                            if (usernameController.text.trim() != _user!.username || 
+                                                emailController.text.trim() != _user!.email) {
+                                              MessDialog.showErrorDialog(context, 'Thông tin không khớp', 'Username hoặc Email không chính xác.');
+                                              return;
+                                            }
+                                            setDialogState(() => currentStep++);
+                                          }
+                                        } else {
+                                          if (newPasswordController.text.isEmpty || confirmPasswordController.text.isEmpty) return;
+                                          if (newPasswordController.text != confirmPasswordController.text) {
+                                            MessDialog.showErrorDialog(context, 'Lỗi', 'Mật khẩu không khớp.');
+                                            return;
+                                          }
+
                                           setDialogState(() => isLoading = true);
-                                          final result = await AuthController.login(_user!.username, currentPasswordController.text);
-                                          
+                                          final result = await AuthController.changePassword(
+                                            currentPassword: currentPasswordController.text,
+                                            username: usernameController.text.trim(),
+                                            email: emailController.text.trim(),
+                                            newPassword: newPasswordController.text,
+                                          );
+
                                           if (mounted) {
                                             setDialogState(() => isLoading = false);
                                             if (result['success'] == true) {
-                                              setDialogState(() => currentStep++);
+                                              Navigator.pop(context);
+                                              MessDialog.showSuccessDialog(context, 'Thành công', 'Mật khẩu đã được thay đổi.');
                                             } else {
-                                              MessDialog.showErrorDialog(context, 'Lỗi xác minh', 'Mật khẩu hiện tại không chính xác.');
+                                              MessDialog.showErrorDialog(context, 'Lỗi', result['message'] ?? 'Thất bại.');
                                             }
                                           }
-                                        } else if (currentStep == 2) {
-                                          if (usernameController.text.isEmpty || emailController.text.isEmpty) return;
-                                          
-                                          if (usernameController.text.trim() != _user!.username || 
-                                              emailController.text.trim() != _user!.email) {
-                                            MessDialog.showErrorDialog(context, 'Thông tin không khớp', 'Username hoặc Email không chính xác.');
-                                            return;
-                                          }
-                                          setDialogState(() => currentStep++);
                                         }
-                                      } else {
-                                        if (newPasswordController.text.isEmpty || confirmPasswordController.text.isEmpty) return;
-                                        if (newPasswordController.text != confirmPasswordController.text) {
-                                          MessDialog.showErrorDialog(context, 'Lỗi', 'Mật khẩu không khớp.');
-                                          return;
-                                        }
-
-                                        setDialogState(() => isLoading = true);
-                                        final result = await AuthController.changePassword(
-                                          currentPassword: currentPasswordController.text,
-                                          username: usernameController.text.trim(),
-                                          email: emailController.text.trim(),
-                                          newPassword: newPasswordController.text,
-                                        );
-
-                                        if (mounted) {
-                                          setDialogState(() => isLoading = false);
-                                          if (result['success'] == true) {
-                                            Navigator.pop(context);
-                                            MessDialog.showSuccessDialog(context, 'Thành công', 'Mật khẩu đã được thay đổi.');
-                                          } else {
-                                            MessDialog.showErrorDialog(context, 'Lỗi', result['message'] ?? 'Thất bại.');
-                                          }
-                                        }
-                                      }
-                                    },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primaryTeal,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                      },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primaryTeal,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                ),
+                                child: isLoading
+                                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                    : Text(currentStep < 3 ? 'Tiếp tục' : 'Hoàn tất', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                               ),
-                              child: isLoading
-                                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                  : Text(currentStep < 3 ? 'Tiếp tục' : 'Hoàn tất', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
