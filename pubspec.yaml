@@ -52,6 +52,7 @@ flutter:
     - assets/danhgia.png
     - assets/lichsubaithi.png
     - assets/tuvungdahoc.png
+    - assets/tuvungyeuthich.png
 
 flutter_launcher_icons:
   android: "launcher_icon"

@@ -135,24 +135,30 @@ class _FavoriteViewState extends State<FavoriteView> {
         backgroundColor: AppColors.primaryTeal,
         elevation: 0,
         centerTitle: true,
-        leading: _isSearching 
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-              onPressed: () => setState(() {
+        leading: IconButton(
+          icon: Icon(
+            _isSearching 
+              ? Icons.arrow_back_ios_new_rounded 
+              : (_isSelectionMode ? Icons.close_rounded : Icons.arrow_back_ios_new_rounded), 
+            color: Colors.white
+          ),
+          onPressed: () {
+            if (_isSearching) {
+              setState(() {
                 _isSearching = false;
                 _searchQuery = "";
                 _searchController.clear();
-              }),
-            )
-          : (_isSelectionMode 
-              ? IconButton(
-                  icon: const Icon(Icons.close_rounded, color: Colors.white),
-                  onPressed: () => setState(() {
-                    _isSelectionMode = false;
-                    _selectedWordIds.clear();
-                  }),
-                )
-              : null),
+              });
+            } else if (_isSelectionMode) {
+              setState(() {
+                _isSelectionMode = false;
+                _selectedWordIds.clear();
+              });
+            } else {
+              Navigator.pop(context);
+            }
+          },
+        ),
         actions: [
           if (!_isSelectionMode && !_isSearching && _favorites.isNotEmpty)
             IconButton(
@@ -185,6 +191,7 @@ class _FavoriteViewState extends State<FavoriteView> {
               children: [
                 Column(
                   children: [
+                    if (!_isSearching) _buildHeader(),
                     Expanded(
                       child: _filteredFavorites.isEmpty ? _buildEmptyState() : _buildFavoriteList(),
                     ),
@@ -199,6 +206,47 @@ class _FavoriteViewState extends State<FavoriteView> {
                   ),
               ],
             ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
+      decoration: const BoxDecoration(
+        color: AppColors.primaryTeal,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(40),
+          bottomRight: Radius.circular(40),
+        ),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppColors.primaryTeal, Color(0xFF2D6A65)],
+        ),
+      ),
+      child: Column(
+        children: [
+          Image.asset(
+            'assets/tuvungyeuthich.png',
+            height: 100,
+            width: 100,
+            errorBuilder: (context, error, stackTrace) =>
+                const Icon(Icons.favorite_rounded, size: 100, color: Colors.white24),
+          ),
+          const SizedBox(height: 15),
+          const Text(
+            'Những từ vựng yêu thích',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

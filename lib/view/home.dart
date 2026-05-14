@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:ksl/component/appColors.dart';
 import 'package:ksl/component/navigation.dart';
 import 'package:ksl/view/favorite.dart';
+import 'package:ksl/view/search.dart';
 import 'package:ksl/view/translate.dart';
 import 'package:ksl/view/settings.dart';
 import 'package:ksl/view/infomation.dart';
@@ -45,7 +46,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final List<Widget> pages = [
       HomeMainContent(user: _user),
-      const FavoriteView(),
+      const SearchView(),
       const TranslateView(),
       const SettingsView(),
     ];
@@ -84,7 +85,7 @@ class _HomePageState extends State<HomePage> {
         builder: (context, user, _) {
           final List<Widget> pages = [
             HomeMainContent(user: user),
-            const FavoriteView(),
+            const SearchView(),
             const TranslateView(),
             const SettingsView(),
           ];

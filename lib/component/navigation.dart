@@ -31,7 +31,7 @@ class KslNavigationBar extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(0, Icons.home_rounded, 'Trang chủ'),
-              _buildNavItem(1, Icons.favorite_rounded, 'Yêu thích'),
+              _buildNavItem(1, Icons.search_rounded, 'Tìm kiếm'),
               _buildNavItem(2, Icons.translate_rounded, 'Dịch thuật'),
               _buildNavItem(3, Icons.settings_rounded, 'Cài đặt'),
             ],

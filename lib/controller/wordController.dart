@@ -43,4 +43,43 @@ class WordController {
       };
     }
   }
+
+  static Future<Map<String, dynamic>> searchWords(String query) async {
+    try {
+      final token = await AuthController.getAccessToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Bạn chưa đăng nhập'};
+      }
+
+      final response = await http.get(
+        Uri.parse('$urlAPI/api/words?search=$query&limit=20'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        final List<dynamic> wordJson = data['data'];
+        final List<WordModel> words = wordJson.map((json) => WordModel.fromJson(json)).toList();
+        
+        return {
+          'success': true,
+          'data': words
+        };
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Không tìm thấy kết quả'
+        };
+      }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Lỗi kết nối server: $e'
+      };
+    }
+  }
 }

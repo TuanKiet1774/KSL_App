@@ -9,7 +9,7 @@ class YoutubeFrame extends StatefulWidget {
   const YoutubeFrame({
     super.key, 
     required this.videoUrl,
-    this.aspectRatio = 16 / 9,
+    this.aspectRatio = 1.0,
   });
 
   @override

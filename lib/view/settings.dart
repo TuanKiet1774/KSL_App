@@ -11,6 +11,7 @@ import 'package:ksl/view/feedback.dart';
 import 'package:ksl/view/progresUser.dart';
 import 'package:ksl/view/learnedWordList.dart';
 import 'package:ksl/view/examHistory.dart';
+import 'package:ksl/view/favorite.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -228,6 +229,17 @@ class _SettingsViewState extends State<SettingsView> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const LearnedWordListScreen()),
+              );
+            },
+          ),
+          _buildDivider(),
+          _buildMenuItem(
+            icon: Icons.favorite_border_rounded,
+            title: 'Từ vựng yêu thích',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const FavoriteView()),
               );
             },
           ),
