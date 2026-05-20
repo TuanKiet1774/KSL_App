@@ -185,27 +185,29 @@ class _FavoriteViewState extends State<FavoriteView> {
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
-          : Stack(
-              children: [
-                Column(
-                  children: [
-                    if (!_isSearching) _buildHeader(),
-                    Expanded(
-                      child: _filteredFavorites.isEmpty ? _buildEmptyState() : _buildFavoriteList(),
-                    ),
-                  ],
-                ),
-                if (_isSelectionMode && _selectedWordIds.isNotEmpty)
-                  Positioned(
-                    left: 20,
-                    right: 20,
-                    bottom: 30,
-                    child: _buildBottomDeleteAction(),
-                  ),
-              ],
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              if (!_isSearching) _buildHeader(),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
+                    : _filteredFavorites.isEmpty
+                        ? _buildEmptyState()
+                        : _buildFavoriteList(),
+              ),
+            ],
+          ),
+          if (_isSelectionMode && _selectedWordIds.isNotEmpty)
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 30,
+              child: _buildBottomDeleteAction(),
             ),
+        ],
+      ),
     );
   }
 

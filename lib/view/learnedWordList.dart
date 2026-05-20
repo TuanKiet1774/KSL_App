@@ -197,29 +197,31 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
-          : _errorMessage.isNotEmpty
-              ? _buildErrorState()
-              : Stack(
-                  children: [
-                    Column(
-                      children: [
-                        if (!_isSearching) _buildHeader(),
-                        Expanded(
-                          child: _filteredWords.isEmpty ? _buildEmptyState() : _buildLearnedWordList(),
-                        ),
-                      ],
-                    ),
-                    if (_isSelectionMode && _selectedWordIds.isNotEmpty)
-                      Positioned(
-                        left: 20,
-                        right: 20,
-                        bottom: 30,
-                        child: _buildBottomDeleteAction(),
-                      ),
-                  ],
-                ),
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              if (!_isSearching) _buildHeader(),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
+                    : _errorMessage.isNotEmpty
+                        ? _buildErrorState()
+                        : _filteredWords.isEmpty
+                            ? _buildEmptyState()
+                            : _buildLearnedWordList(),
+              ),
+            ],
+          ),
+          if (_isSelectionMode && _selectedWordIds.isNotEmpty)
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 30,
+              child: _buildBottomDeleteAction(),
+            ),
+        ],
+      ),
     );
   }
 

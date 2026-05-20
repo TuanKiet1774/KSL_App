@@ -83,30 +83,30 @@ class _ExamHistoryPageState extends State<ExamHistoryPage> {
             ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
-          : _errorMessage.isNotEmpty
-              ? _buildErrorState()
-              : Column(
-                  children: [
-                    _buildHeader(),
-                    Expanded(
-                      child: _history.isEmpty
-                          ? _buildEmptyState()
-                          : RefreshIndicator(
-                              onRefresh: _fetchHistory,
-                              color: AppColors.primaryTeal,
-                              child: ListView.builder(
-                                padding: const EdgeInsets.all(20),
-                                itemCount: _history.length,
-                                itemBuilder: (context, index) {
-                                  return _buildDismissibleCard(_history[index], index);
-                                },
-                              ),
+      body: Column(
+        children: [
+          _buildHeader(),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
+                : _errorMessage.isNotEmpty
+                    ? _buildErrorState()
+                    : _history.isEmpty
+                        ? _buildEmptyState()
+                        : RefreshIndicator(
+                            onRefresh: _fetchHistory,
+                            color: AppColors.primaryTeal,
+                            child: ListView.builder(
+                              padding: const EdgeInsets.all(20),
+                              itemCount: _history.length,
+                              itemBuilder: (context, index) {
+                                return _buildDismissibleCard(_history[index], index);
+                              },
                             ),
-                    ),
-                  ],
-                ),
+                          ),
+          ),
+        ],
+      ),
     );
   }
 

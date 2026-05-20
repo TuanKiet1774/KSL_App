@@ -67,69 +67,77 @@ class _SearchViewState extends State<SearchView> {
   Future<void> _initData() async {
     if (!mounted) return;
     setState(() => _isInitializing = true);
-    
-    // 1. Lấy thông tin user và progress để có EXP chính xác nhất
-    final profileResult = await AuthController.getProfile();
-    _currentUser = profileResult['success'] ? profileResult['user'] : await AuthController.getSavedUser();
-    
-    final progressResult = await ProgressController.getUserProgress();
+
+    // Gọi song song 3 API cùng lúc thay vì tuần tự
+    final fetchResults = await Future.wait([
+      AuthController.getProfile(),
+      ProgressController.getUserProgress(),
+      TopicController.getAllTopics(limit: 100),
+    ]);
+
+    final profileResult = fetchResults[0];
+    final progressResult = fetchResults[1];
+    final topicsResult = fetchResults[2];
+
+    if (profileResult['success']) {
+      _currentUser = profileResult['user'];
+    } else {
+      _currentUser = await AuthController.getSavedUser();
+    }
+
     if (progressResult['success']) {
       _userProgress = progressResult['data'];
     }
 
-    final int userExp = _userProgress?.stats.totalExp ?? _currentUser?.exp ?? 0;
-
-    // 2. Lấy tất cả topics
-    final topicsResult = await TopicController.getAllTopics(limit: 100);
     if (topicsResult['success']) {
       _allTopics = topicsResult['data'];
     }
 
-    // 3. Lọc các topic đã mở
+    final int userExp = _userProgress?.stats.totalExp ?? _currentUser?.exp ?? 0;
+
     if (_allTopics.isNotEmpty) {
       _openedTopicIds = _allTopics
           .where((t) => t.expRequired <= userExp)
           .map((t) => t.id)
           .toList();
-
-      if (_openedTopicIds.isNotEmpty) {
-        _currentTopicIndex = 0;
-        await _loadMoreInitialWords();
-      }
     }
 
-    if (mounted) {
-      setState(() => _isInitializing = false);
+    // Hiển thị UI ngay, load từ gợi ý ở nền
+    if (mounted) setState(() => _isInitializing = false);
+
+    if (_openedTopicIds.isNotEmpty) {
+      _currentTopicIndex = 0;
+      _loadMoreInitialWords();
     }
   }
 
   Future<void> _loadMoreInitialWords() async {
     if (_isFetchingMoreInitial || _currentTopicIndex >= _openedTopicIds.length) return;
 
-    setState(() => _isFetchingMoreInitial = true);
+    if (mounted) setState(() => _isFetchingMoreInitial = true);
 
-    // Lặp để tìm topic có dữ liệu (tránh trường hợp topic đầu tiên bị trống)
+    final int countBefore = _initialWords.length;
+
+    // Tiếp tục load topics cho đến khi có đủ từ để list có thể scroll
     while (_currentTopicIndex < _openedTopicIds.length) {
       final topicId = _openedTopicIds[_currentTopicIndex];
       final wordsResult = await WordController.getWordsByTopic(topicId, limit: 20);
-      
-      if (mounted && wordsResult['success']) {
+      _currentTopicIndex++;
+
+      if (!mounted) return;
+
+      if (wordsResult['success']) {
         final List<WordModel> newWords = wordsResult['data'];
         if (newWords.isNotEmpty) {
-          setState(() {
-            _initialWords.addAll(newWords);
-            _currentTopicIndex++;
-            _isFetchingMoreInitial = false;
-          });
-          return; // Đã tìm thấy dữ liệu, dừng lặp
+          setState(() => _initialWords.addAll(newWords));
         }
       }
-      _currentTopicIndex++; // Thử topic tiếp theo nếu topic này trống
+
+      // Dừng khi đã thêm đủ từ để list có thể scroll (~15 từ mới)
+      if (_initialWords.length - countBefore >= 15) break;
     }
 
-    if (mounted) {
-      setState(() => _isFetchingMoreInitial = false);
-    }
+    if (mounted) setState(() => _isFetchingMoreInitial = false);
   }
 
   void _onSearchChanged(String value) {
@@ -137,6 +145,15 @@ class _SearchViewState extends State<SearchView> {
     _debounce = Timer(const Duration(milliseconds: 500), () {
       _performSearch(value);
     });
+  }
+
+  int _relevanceScore(WordModel word, String query) {
+    final name = word.name.toLowerCase();
+    final q = query.toLowerCase().trim();
+    if (name == q) return 3;
+    if (name.startsWith(q)) return 2;
+    if (name.contains(q)) return 1;
+    return 0;
   }
 
   Future<void> _performSearch(String value) async {
@@ -155,10 +172,12 @@ class _SearchViewState extends State<SearchView> {
     });
 
     final result = await WordController.searchWords(value);
-    
+
     if (mounted) {
+      final List<WordModel> results = result['success'] ? List<WordModel>.from(result['data']) : [];
+      results.sort((a, b) => _relevanceScore(b, value).compareTo(_relevanceScore(a, value)));
       setState(() {
-        _searchResults = result['success'] ? result['data'] : [];
+        _searchResults = results;
         _isLoading = false;
       });
     }
@@ -220,15 +239,71 @@ class _SearchViewState extends State<SearchView> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
-      appBar: AppBar(
-        title: const Text('Tìm kiếm ký hiệu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: AppColors.primaryTeal,
-        elevation: 0,
-        centerTitle: true,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight + 80),
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.primaryTeal, Color(0xFF236B65)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(40),
+              bottomRight: Radius.circular(40),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x3A1A4D49),
+                blurRadius: 10,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: AppBar(
+            title: const Text(
+              'Tìm kiếm ký hiệu',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.3,
+              ),
+            ),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            centerTitle: true,
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(80),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 15, offset: const Offset(0, 8))],
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: _onSearchChanged,
+                    decoration: InputDecoration(
+                      hintText: 'Nhập ký hiệu cần tìm...',
+                      hintStyle: TextStyle(color: Colors.grey.shade400),
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primaryTeal),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(icon: const Icon(Icons.clear_rounded, color: Colors.grey), onPressed: () { _searchController.clear(); _performSearch(''); })
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
       body: Column(
         children: [
-          _buildSearchHeader(),
           Expanded(
             child: _isInitializing
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
@@ -239,47 +314,6 @@ class _SearchViewState extends State<SearchView> {
                         : _searchResults.isEmpty
                             ? _buildEmptyState()
                             : _buildResultsList(_searchResults, null),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
-      decoration: const BoxDecoration(
-        color: AppColors.primaryTeal,
-        borderRadius: BorderRadius.only(bottomLeft: Radius.circular(40), bottomRight: Radius.circular(40)),
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.primaryTeal, Color(0xFF2D6A65)],
-        ),
-      ),
-      child: Column(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 15, offset: const Offset(0, 8))],
-            ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              decoration: InputDecoration(
-                hintText: 'Nhập ký hiệu cần tìm...',
-                hintStyle: TextStyle(color: Colors.grey.shade400),
-                prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primaryTeal),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(icon: const Icon(Icons.clear_rounded, color: Colors.grey), onPressed: () { _searchController.clear(); _performSearch(''); })
-                    : null,
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              ),
-            ),
           ),
         ],
       ),
