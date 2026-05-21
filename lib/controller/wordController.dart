@@ -64,7 +64,7 @@ class WordController {
       if (response.statusCode == 200 && data['success'] == true) {
         final List<dynamic> wordJson = data['data'];
         final List<WordModel> words = wordJson.map((json) => WordModel.fromJson(json)).toList();
-        
+
         return {
           'success': true,
           'data': words
@@ -80,6 +80,37 @@ class WordController {
         'success': false,
         'message': 'Lỗi kết nối server: $e'
       };
+    }
+  }
+
+  static Future<Map<String, dynamic>> analyzeSign(String sentence) async {
+    try {
+      final token = await AuthController.getAccessToken();
+      if (token == null) {
+        return {'success': false, 'message': 'Bạn chưa đăng nhập'};
+      }
+
+      final response = await http.post(
+        Uri.parse('$urlAPI/api/sign-guidance/analyze'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({'sentence': sentence}),
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {'success': true, 'data': data['data']};
+      } else {
+        return {
+          'success': false,
+          'message': data['message'] ?? 'Không thể phân tích câu',
+        };
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Lỗi kết nối server: $e'};
     }
   }
 }

@@ -2,12 +2,17 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:camera/camera.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:image/image.dart' as img;
 import 'package:percent_indicator/percent_indicator.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:ksl/component/appColors.dart';
+import 'package:ksl/component/youtubeFrame.dart';
+import 'package:ksl/controller/wordController.dart';
+import 'package:ksl/model/word.dart';
 import 'vsl_classifier.dart';
 
 class RecognitionScreen extends StatefulWidget {
@@ -37,6 +42,10 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
 
   int _currentMode = 0;
   final TextEditingController _inputController = TextEditingController();
+
+  bool _isAnalyzing = false;
+  Map<String, dynamic>? _analyzeResult;
+  String _analyzeError = '';
 
   @override
   void initState() {
@@ -197,6 +206,34 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
 
     if (mounted && _isCameraStarted) {
       await _initCamera();
+    }
+  }
+
+  Future<void> _analyzeSignLanguage() async {
+    FocusScope.of(context).unfocus();
+    final sentence = _inputController.text.trim();
+    if (sentence.isEmpty) {
+      setState(() => _analyzeError = 'Vui lòng nhập câu cần phân tích');
+      return;
+    }
+
+    setState(() {
+      _isAnalyzing = true;
+      _analyzeResult = null;
+      _analyzeError = '';
+    });
+
+    final result = await WordController.analyzeSign(sentence);
+
+    if (mounted) {
+      setState(() {
+        _isAnalyzing = false;
+        if (result['success'] == true) {
+          _analyzeResult = result['data'] as Map<String, dynamic>;
+        } else {
+          _analyzeError = result['message'] ?? 'Đã xảy ra lỗi';
+        }
+      });
     }
   }
 
@@ -474,16 +511,367 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                 ),
                 const SizedBox(height: 16),
                 _buildGradientButton(
-                  label: 'Hướng dẫn ký hiệu',
-                  icon: Icons.play_circle_outline_rounded,
-                  onTap: () => setState(() => _statusMsg = 'Đang phân tích câu...'),
+                  label: _isAnalyzing ? 'Đang phân tích...' : 'Hướng dẫn ký hiệu',
+                  icon: _isAnalyzing ? Icons.hourglass_empty_rounded : Icons.play_circle_outline_rounded,
+                  onTap: _isAnalyzing ? () {} : _analyzeSignLanguage,
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
+          if (_isAnalyzing)
+            _buildAnalyzingLoader()
+          else if (_analyzeError.isNotEmpty)
+            _buildAnalyzeError()
+          else if (_analyzeResult != null)
+            _buildAnalyzeResults(_analyzeResult!)
+          else
+            _buildGuidePlaceholder(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuidePlaceholder() {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
           Container(
-            padding: const EdgeInsets.all(28),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.primaryTeal.withOpacity(0.07),
+              shape: BoxShape.circle,
+            ),
+            child: Image.asset(
+              'assets/huongdankyhieu.png',
+              width: 80,
+              height: 80,
+              fit: BoxFit.contain,
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'Hướng dẫn ký hiệu của bạn',
+            style: TextStyle(
+              color: AppColors.primaryBlue,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Nhập nội dung ở trên và nhấn nút để xem video hoặc ảnh động hướng dẫn thực hiện ký hiệu thủ ngữ tương ứng.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 13, height: 1.6),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalyzingLoader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 40,
+            height: 40,
+            child: CircularProgressIndicator(
+              color: AppColors.primaryTeal,
+              strokeWidth: 3,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Đang phân tích câu...',
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalyzeError() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.red.shade100),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.error_outline_rounded, color: Colors.red.shade400, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _analyzeError,
+              style: TextStyle(color: Colors.red.shade600, fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalyzeResults(Map<String, dynamic> result) {
+    final List<dynamic> words = result['words'] ?? [];
+    final List<dynamic> removedWords = result['removedWords'] ?? [];
+    final List<dynamic> signSequence = result['signSequence'] ?? [];
+    final String originalSentence = result['originalSentence'] ?? '';
+
+    final List<WordModel> foundWords = [];
+    final List<int> foundIndices = [];
+    for (final w in words) {
+      final wMap = w as Map<String, dynamic>;
+      if (wMap['found'] == true && wMap['data'] != null) {
+        foundWords.add(WordModel.fromJson(wMap['data'] as Map<String, dynamic>));
+        foundIndices.add(foundWords.length - 1);
+      } else {
+        foundIndices.add(-1);
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── Phần 1: Câu gốc → Câu rút gọn ──────────────────────────────
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 15,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Tiêu đề
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryTeal.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.compare_arrows_rounded,
+                        size: 18, color: AppColors.primaryTeal),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Câu rút gọn',
+                    style: TextStyle(
+                      color: AppColors.primaryBlue,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Câu gốc
+              Text(
+                'Câu gốc',
+                style: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Text(
+                  originalSentence,
+                  style: const TextStyle(
+                    color: AppColors.primaryBlue,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+
+              // Mũi tên xuống
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Icon(Icons.keyboard_arrow_down_rounded,
+                      size: 28, color: AppColors.primaryTeal.withOpacity(0.5)),
+                ),
+              ),
+
+              // Câu rút gọn dạng chip
+              Text(
+                'Trình tự ký hiệu',
+                style: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: List.generate(signSequence.length, (index) {
+                  final word = signSequence[index].toString();
+                  final wordData = words.firstWhere(
+                        (w) => w['word'].toString().toLowerCase() == word.toLowerCase(),
+                    orElse: () => <String, dynamic>{'displayWord': word, 'found': false},
+                  );
+                  final displayWord = (wordData['displayWord'] ?? word).toString();
+                  final isFound = wordData['found'] == true;
+
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isFound
+                              ? AppColors.primaryTeal.withOpacity(0.1)
+                              : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isFound
+                                ? AppColors.primaryTeal.withOpacity(0.3)
+                                : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '${index + 1}',
+                              style: TextStyle(
+                                color: isFound ? AppColors.primaryTeal : Colors.grey.shade400,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              displayWord.toUpperCase(),
+                              style: TextStyle(
+                                color: isFound ? AppColors.primaryTeal : Colors.grey.shade500,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (index < signSequence.length - 1)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2),
+                          child: Icon(Icons.arrow_forward_ios_rounded,
+                              size: 10, color: Colors.grey.shade400),
+                        ),
+                    ],
+                  );
+                }),
+              ),
+
+              // Từ bị lọc bỏ
+              if (removedWords.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Divider(color: Colors.grey.shade100),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Icon(Icons.remove_circle_outline_rounded,
+                        size: 14, color: Colors.grey.shade400),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Từ lược bỏ: ',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        removedWords.join(', '),
+                        style: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 12,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+
+        // ── Phần 2: Gợi ý ký hiệu ────────────────────────────────────────
+        if (words.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
@@ -496,41 +884,217 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
               ],
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryTeal.withOpacity(0.07),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Image.asset(
-                    'assets/huongdankyhieu.png',
-                    width: 80,
-                    height: 80,
-                    fit: BoxFit.contain,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryTeal.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.sign_language_rounded,
+                              size: 18, color: AppColors.primaryTeal),
+                        ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'Gợi ý ký hiệu',
+                          style: TextStyle(
+                            color: AppColors.primaryBlue,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryTeal.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${words.where((w) => w['found'] == true).length}/${words.length} từ',
+                        style: const TextStyle(
+                          color: AppColors.primaryTeal,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 18),
-                const Text(
-                  'Hướng dẫn ký hiệu của bạn',
-                  style: TextStyle(
-                    color: AppColors.primaryBlue,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 160,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.only(bottom: 4),
+                    itemCount: words.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemBuilder: (_, i) => _buildWordCard(words[i] as Map<String, dynamic>, foundWords, foundIndices[i]),
                   ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Nhập nội dung ở trên và nhấn nút để xem video hoặc ảnh động hướng dẫn thực hiện ký hiệu thủ ngữ tương ứng.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 13, height: 1.6),
                 ),
               ],
             ),
           ),
         ],
+      ],
+    );
+  }
+
+  Widget _buildWordCard(Map<String, dynamic> wordResult, List<WordModel> foundWords, int foundIndex) {
+    final String rawWord = wordResult['word'] ?? '';
+    final String displayWord = wordResult['displayWord'] ?? rawWord;
+    final bool found = wordResult['found'] == true;
+    final Map<String, dynamic>? data = wordResult['data'] as Map<String, dynamic>?;
+
+    WordModel? wordModel;
+    if (found && data != null) {
+      wordModel = WordModel.fromJson(data);
+    }
+
+    return GestureDetector(
+      onTap: found && wordModel != null ? () => _showWordDetailSheet(foundWords, foundIndex) : null,
+      child: Container(
+        width: 110,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: found ? AppColors.primaryTeal.withOpacity(0.25) : Colors.grey.shade200,
+          ),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 3)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                child: _buildCardThumbnail(wordModel, rawWord),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+              decoration: BoxDecoration(
+                color: found ? AppColors.primaryTeal.withOpacity(0.04) : Colors.grey.shade50,
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(15)),
+              ),
+              child: Text(
+                wordModel?.name ?? displayWord,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: found ? AppColors.primaryBlue : Colors.grey.shade400,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  height: 1.3,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  Widget _buildCardThumbnail(WordModel? wordModel, [String rawWord = '']) {
+    if (wordModel == null) {
+      final isSingleLetter = rawWord.length == 1 &&
+          RegExp(r'^[A-ZĂÂÊÔƠƯĐa-zăâêôơưđ]$').hasMatch(rawWord);
+      if (isSingleLetter) {
+        return Container(
+          color: AppColors.primaryTeal.withOpacity(0.06),
+          child: Center(
+            child: Text(
+              rawWord.toUpperCase(),
+              style: const TextStyle(
+                color: AppColors.primaryTeal,
+                fontSize: 38,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        );
+      }
+      return Container(
+        color: Colors.grey.shade100,
+        child: Center(
+          child: Icon(Icons.sign_language_rounded, size: 32, color: Colors.grey.shade300),
+        ),
+      );
+    }
+
+    final media = wordModel.media;
+    final youtubeLink = wordModel.youtubeLink;
+
+    if (media.url.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: media.url,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => Container(
+          color: AppColors.primaryTeal.withOpacity(0.05),
+          child: const Center(
+            child: SizedBox(
+              width: 18, height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryTeal),
+            ),
+          ),
+        ),
+        errorWidget: (_, __, ___) => Container(
+          color: Colors.grey.shade100,
+          child: Icon(Icons.broken_image_rounded, color: Colors.grey.shade300, size: 24),
+        ),
+      );
+    }
+
+    if (youtubeLink.isNotEmpty) {
+      final videoId = YoutubePlayer.convertUrlToId(youtubeLink);
+      if (videoId != null) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            CachedNetworkImage(
+              imageUrl: 'https://img.youtube.com/vi/$videoId/mqdefault.jpg',
+              fit: BoxFit.cover,
+              errorWidget: (_, __, ___) => Container(color: Colors.grey.shade100),
+            ),
+            Container(color: Colors.black26),
+            const Center(
+              child: Icon(Icons.play_circle_filled_rounded, color: Colors.white, size: 28),
+            ),
+          ],
+        );
+      }
+    }
+
+    return Container(
+      color: AppColors.primaryTeal.withOpacity(0.05),
+      child: const Center(
+        child: Icon(Icons.sign_language_rounded, size: 32, color: AppColors.primaryTeal),
+      ),
+    );
+  }
+
+  void _showWordDetailSheet(List<WordModel> words, int initialIndex) {
+    FocusScope.of(context).unfocus();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _WordDetailSheet(words: words, initialIndex: initialIndex),
+    ).then((_) {
+      if (mounted) FocusScope.of(context).unfocus();
+    });
   }
 
   Widget _buildGradientButton({
@@ -1139,5 +1703,211 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
     if (c >= 0.85) return const Color(0xFF2E7D32);
     if (c >= 0.65) return AppColors.accentOrange;
     return Colors.redAccent;
+  }
+}
+
+// ─── Word Detail Bottom Sheet ─────────────────────────────────────────────────
+
+class _WordDetailSheet extends StatefulWidget {
+  final List<WordModel> words;
+  final int initialIndex;
+  const _WordDetailSheet({required this.words, required this.initialIndex});
+
+  @override
+  State<_WordDetailSheet> createState() => _WordDetailSheetState();
+}
+
+class _WordDetailSheetState extends State<_WordDetailSheet> {
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final word = widget.words[_currentIndex];
+    final bool hasPrev = _currentIndex > 0;
+    final bool hasNext = _currentIndex < widget.words.length - 1;
+    final bool hasNav = widget.words.length > 1;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.72,
+      minChildSize: 0.4,
+      maxChildSize: 0.93,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: SingleChildScrollView(
+            controller: scrollController,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 12),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (hasNav)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Row(
+                            children: [
+                              _NavButton(
+                                icon: Icons.arrow_back_ios_new_rounded,
+                                onTap: hasPrev ? () => setState(() => _currentIndex--) : null,
+                              ),
+                              Expanded(
+                                child: Center(
+                                  child: Text(
+                                    '${_currentIndex + 1} / ${widget.words.length}',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey.shade500,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              _NavButton(
+                                icon: Icons.arrow_forward_ios_rounded,
+                                onTap: hasNext ? () => setState(() => _currentIndex++) : null,
+                              ),
+                            ],
+                          ),
+                        ),
+                      if (word.media.url.isNotEmpty || word.youtubeLink.isNotEmpty)
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: AppColors.primaryTeal.withOpacity(0.3),
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(18),
+                            child: word.youtubeLink.isNotEmpty &&
+                                    YoutubePlayer.convertUrlToId(word.youtubeLink) != null
+                                ? YoutubeFrame(
+                                    key: ValueKey(word.id),
+                                    videoUrl: word.youtubeLink,
+                                    aspectRatio: 1,
+                                  )
+                                : AspectRatio(
+                                    aspectRatio: 1,
+                                    child: CachedNetworkImage(
+                                      key: ValueKey(word.id),
+                                      imageUrl: word.media.url,
+                                      fit: BoxFit.cover,
+                                      placeholder: (_, __) => Center(
+                                        child: CircularProgressIndicator(
+                                          color: AppColors.primaryTeal.withOpacity(0.5),
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                      errorWidget: (_, __, ___) => const Icon(
+                                        Icons.image_not_supported_rounded,
+                                        size: 60,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      const SizedBox(height: 24),
+                      Text(
+                        word.name,
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primaryBlue,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      if (word.description.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        const Text(
+                          'ĐỊNH NGHĨA',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.grey,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          word.description,
+                          style: TextStyle(
+                            fontSize: 17,
+                            color: Colors.grey.shade800,
+                            height: 1.6,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _NavButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  const _NavButton({required this.icon, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final bool enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: enabled ? AppColors.primaryTeal.withOpacity(0.1) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: enabled ? AppColors.primaryTeal.withOpacity(0.25) : Colors.grey.shade200,
+          ),
+        ),
+        child: Icon(
+          icon,
+          size: 16,
+          color: enabled ? AppColors.primaryTeal : Colors.grey.shade300,
+        ),
+      ),
+    );
   }
 }
