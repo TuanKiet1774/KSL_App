@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'package:camera/camera.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,17 +28,21 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
   CameraController? _cameraCtrl;
   final VSLClassifier _classifier = VSLClassifier();
 
-  bool _isCameraReady  = false;
-  bool _isModelLoaded  = false;
-  bool _isProcessing   = false;
-  bool _isFrontCamera  = true;
+  bool _isCameraReady   = false;
+  bool _isModelLoaded   = false;
+  bool _isProcessing    = false;
+  bool _isFrontCamera   = true;
   bool _isCameraStarted = false;
+  bool _isInitializing  = false;
+
+  Timer? _frameTimer;
+  Timer? _idleTimer;
+  static const _idleTimeout = Duration(minutes: 1);
 
   List<PredictionResult> _predictions = [];
   Uint8List? _skeletonPreview;
   String _statusMsg = 'Sẵn sàng';
-  DateTime _lastProcess = DateTime.now();
-  static const _interval = Duration(milliseconds: 300);
+  static const _interval = Duration(milliseconds: 350);
 
   int _currentMode = 0;
   final TextEditingController _inputController = TextEditingController();
@@ -64,6 +68,12 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
   }
 
   Future<void> _stopCamera() async {
+    _frameTimer?.cancel();
+    _frameTimer = null;
+    _idleTimer?.cancel();
+    _idleTimer = null;
+    WakelockPlus.disable();
+
     final ctrl = _cameraCtrl;
     if (ctrl == null) return;
 
@@ -84,53 +94,65 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
     }
 
     try {
-      if (ctrl.value.isStreamingImages) await ctrl.stopImageStream();
-    } catch (_) {}
-    try {
       await ctrl.dispose();
     } catch (_) {}
   }
 
   Future<void> _initCamera() async {
+    if (_isInitializing) return;
+    _isInitializing = true;
+    CameraController? ctrl;
     try {
       final cameras = await availableCameras();
       if (!mounted || !_isCameraStarted) return;
 
       final cam = cameras.firstWhere(
-            (c) => c.lensDirection == (_isFrontCamera
+        (c) => c.lensDirection == (_isFrontCamera
             ? CameraLensDirection.front : CameraLensDirection.back),
         orElse: () => cameras.first,
       );
-      _cameraCtrl = CameraController(cam, ResolutionPreset.medium,
-          enableAudio: false);
-      await _cameraCtrl!.initialize();
+      ctrl = CameraController(cam, ResolutionPreset.medium, enableAudio: false);
+      await ctrl.initialize();
+
       if (!mounted || !_isCameraStarted) {
-        await _cameraCtrl?.dispose();
-        _cameraCtrl = null;
+        await ctrl.dispose();
         return;
       }
 
-      _cameraCtrl!.startImageStream(_onFrame);
-      setState(() {
-        _isCameraReady = true;
-        _statusMsg = 'Giơ bàn tay vào camera';
+      _cameraCtrl = ctrl;
+      _frameTimer = Timer.periodic(_interval, (_) {
+        if (_currentMode == 1 && _isModelLoaded && !_isProcessing &&
+            mounted && _cameraCtrl != null) {
+          _processFrame();
+        }
       });
+      WakelockPlus.enable();
+      _resetIdleTimer();
+
+      if (mounted) {
+        setState(() {
+          _isCameraReady = true;
+          _statusMsg = 'Giơ bàn tay vào camera';
+        });
+      }
     } catch (e) {
+      await ctrl?.dispose();
       if (mounted) {
         setState(() {
           _statusMsg = 'Lỗi camera: $e';
           _isCameraStarted = false;
         });
       }
+    } finally {
+      _isInitializing = false;
     }
   }
 
-  void _onFrame(CameraImage frame) {
-    if (_currentMode != 1) return;
-    if (!_isModelLoaded || _isProcessing) return;
-    if (DateTime.now().difference(_lastProcess) < _interval) return;
-    _lastProcess = DateTime.now();
-    _processFrame();
+  void _resetIdleTimer() {
+    _idleTimer?.cancel();
+    _idleTimer = Timer(_idleTimeout, () {
+      if (mounted && _isCameraStarted) _stopCamera();
+    });
   }
 
   Future<void> _processFrame() async {
@@ -166,6 +188,7 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
       final preds = _classifier.predict(skeletonImage, topK: 3);
       if (!mounted || _cameraCtrl == null) return;
 
+      _resetIdleTimer();
       setState(() {
         _predictions     = preds;
         _skeletonPreview = skeletonBytes;
@@ -183,12 +206,16 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
   }
 
   Future<void> _flipCamera() async {
+    _frameTimer?.cancel();
+    _frameTimer = null;
+    _idleTimer?.cancel();
+    _idleTimer = null;
+
     final ctrl = _cameraCtrl;
     if (ctrl == null) return;
 
     _isFrontCamera = !_isFrontCamera;
 
-    // Null out state BEFORE disposing to prevent stale CameraPreview build
     if (mounted) {
       setState(() {
         _cameraCtrl = null;
@@ -200,7 +227,6 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
     }
 
     try {
-      if (ctrl.value.isStreamingImages) await ctrl.stopImageStream();
       await ctrl.dispose();
     } catch (_) {}
 
@@ -239,6 +265,9 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
 
   @override
   void dispose() {
+    _frameTimer?.cancel();
+    _idleTimer?.cancel();
+    WakelockPlus.disable();
     _cameraCtrl?.dispose();
     _classifier.dispose();
     _inputController.dispose();
@@ -1144,8 +1173,7 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
   // ─── Camera Placeholder ───────────────────────────────────────────────────
 
   Widget _buildCameraPlaceholder() {
-    return Center(
-      child: SingleChildScrollView(
+    return SingleChildScrollView(
         physics: const BouncingScrollPhysics(),
         child: Container(
           padding: const EdgeInsets.all(32),
@@ -1207,7 +1235,6 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
             ],
           ),
         ),
-      ),
     );
   }
 
@@ -1215,9 +1242,12 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
 
   Widget _buildCamera() {
     if (!_isCameraReady || _cameraCtrl == null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      return Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 40),
+          child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(20),
@@ -1244,11 +1274,16 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
               ),
             ),
           ],
+          ),
         ),
       );
     }
 
-    return Stack(
+    return Align(
+      alignment: Alignment.topCenter,
+      child: AspectRatio(
+        aspectRatio: 1.0,
+        child: Stack(
       children: [
         // Camera preview
         Positioned.fill(
@@ -1265,7 +1300,14 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(24),
-              child: CameraPreview(_cameraCtrl!),
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _cameraCtrl!.value.previewSize?.height ?? 480,
+                  height: _cameraCtrl!.value.previewSize?.width ?? 640,
+                  child: CameraPreview(_cameraCtrl!),
+                ),
+              ),
             ),
           ),
         ),
@@ -1347,6 +1389,8 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
           child: Center(child: _buildStatusBadge()),
         ),
       ],
+        ),
+      ),
     );
   }
 
@@ -1475,54 +1519,17 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
           AnimatedSize(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
-            child: _predictions.isEmpty ? _buildEmpty() : _buildPredictions(),
+            child: _buildPredictions(),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmpty() {
-    return SizedBox(
-      height: 140,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.primaryTeal.withOpacity(0.07),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.back_hand_rounded,
-                size: 34,
-                color: AppColors.primaryTeal.withOpacity(0.7),
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'Giơ bàn tay trước camera để nhận dạng',
-              style: TextStyle(
-                color: AppColors.primaryBlue,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Hệ thống sẽ tự động quét và phân tích cử chỉ',
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildPredictions() {
-    final top = _predictions.first;
+    final bool hasResult = _predictions.isNotEmpty;
+    final top = hasResult ? _predictions.first : null;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1541,18 +1548,26 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: _confColor(top.confidence).withOpacity(0.1),
+                color: hasResult
+                    ? _confColor(top!.confidence).withOpacity(0.1)
+                    : Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.bolt_rounded, color: _confColor(top.confidence), size: 14),
+                  Icon(
+                    Icons.bolt_rounded,
+                    color: hasResult ? _confColor(top!.confidence) : Colors.grey.shade400,
+                    size: 14,
+                  ),
                   const SizedBox(width: 4),
                   Text(
-                    '${(top.confidence * 100).toStringAsFixed(0)}% tin cậy',
+                    hasResult
+                        ? '${(top!.confidence * 100).toStringAsFixed(0)}% tin cậy'
+                        : 'Chờ nhận dạng',
                     style: TextStyle(
-                      color: _confColor(top.confidence),
+                      color: hasResult ? _confColor(top!.confidence) : Colors.grey.shade400,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1568,33 +1583,43 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                AppColors.primaryTeal.withOpacity(0.07),
+                AppColors.primaryTeal.withOpacity(hasResult ? 0.07 : 0.03),
                 AppColors.primaryTeal.withOpacity(0.02),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.primaryTeal.withOpacity(0.12)),
+            border: Border.all(
+              color: hasResult
+                  ? AppColors.primaryTeal.withOpacity(0.12)
+                  : Colors.grey.shade200,
+            ),
           ),
           child: Row(
             children: [
               Expanded(
                 child: Center(
-                  child: Text(
-                    top.label,
-                    style: const TextStyle(
-                      color: AppColors.primaryBlue,
-                      fontSize: 72,
-                      fontWeight: FontWeight.w900,
-                      height: 1.0,
-                    ),
-                  ).animate(key: ValueKey(top.label))
-                      .scale(
-                        begin: const Offset(0.85, 0.85),
-                        duration: 180.ms,
-                        curve: Curves.easeOutBack,
-                      ),
+                  child: hasResult
+                      ? Text(
+                          top!.label,
+                          style: const TextStyle(
+                            color: AppColors.primaryBlue,
+                            fontSize: 72,
+                            fontWeight: FontWeight.w900,
+                            height: 1.0,
+                          ),
+                        ).animate(key: ValueKey(top.label))
+                            .scale(
+                              begin: const Offset(0.85, 0.85),
+                              duration: 180.ms,
+                              curve: Curves.easeOutBack,
+                            )
+                      : Icon(
+                          Icons.back_hand_rounded,
+                          size: 52,
+                          color: AppColors.primaryTeal.withOpacity(0.35),
+                        ),
                 ),
               ),
               Container(
@@ -1603,98 +1628,164 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 color: AppColors.primaryTeal.withOpacity(0.15),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${(top.confidence * 100).toStringAsFixed(1)}%',
-                    style: TextStyle(
-                      color: _confColor(top.confidence),
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
+              hasResult
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${(top!.confidence * 100).toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            color: _confColor(top.confidence),
+                            fontSize: 30,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: 100,
+                          child: LinearPercentIndicator(
+                            lineHeight: 7,
+                            percent: top.confidence.clamp(0.0, 1.0),
+                            backgroundColor: Colors.grey.shade200,
+                            progressColor: _confColor(top.confidence),
+                            barRadius: const Radius.circular(4),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ],
+                    )
+                  : SizedBox(
+                      width: 100,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '--',
+                            style: TextStyle(
+                              color: Colors.grey.shade300,
+                              fontSize: 30,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          LinearPercentIndicator(
+                            lineHeight: 7,
+                            percent: 0,
+                            backgroundColor: Colors.grey.shade200,
+                            progressColor: Colors.grey.shade300,
+                            barRadius: const Radius.circular(4),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: 100,
-                    child: LinearPercentIndicator(
-                      lineHeight: 7,
-                      percent: top.confidence.clamp(0.0, 1.0),
-                      backgroundColor: Colors.grey.shade200,
-                      progressColor: _confColor(top.confidence),
-                      barRadius: const Radius.circular(4),
-                      padding: EdgeInsets.zero,
-                    ),
-                  ),
-                ],
-              ),
               const SizedBox(width: 4),
             ],
           ),
         ),
-        if (_predictions.length > 1) ...[
-          const SizedBox(height: 16),
-          const Text(
-            'Các kết quả khác',
-            style: TextStyle(
-              color: Colors.grey,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.3,
-            ),
+        const SizedBox(height: 16),
+        const Text(
+          'Các kết quả khác',
+          style: TextStyle(
+            color: Colors.grey,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.3,
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: _predictions.skip(1).map((p) {
-              return Expanded(
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade200),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.02),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        p.label,
-                        style: const TextStyle(
-                          color: AppColors.primaryBlue,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _confColor(p.confidence).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${(p.confidence * 100).toStringAsFixed(1)}%',
-                          style: TextStyle(
-                            color: _confColor(p.confidence),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: hasResult && _predictions.length > 1
+              ? _predictions.skip(1).map((p) {
+                  return Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade200),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.02),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
+                      child: Column(
+                        children: [
+                          Text(
+                            p.label,
+                            style: const TextStyle(
+                              color: AppColors.primaryBlue,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _confColor(p.confidence).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${(p.confidence * 100).toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                color: _confColor(p.confidence),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList()
+              : List.generate(2, (_) {
+                  return Expanded(
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '--',
+                            style: TextStyle(
+                              color: Colors.grey.shade300,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '0.0%',
+                              style: TextStyle(
+                                color: Colors.grey.shade400,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+        ),
       ],
     );
   }

@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:ksl/component/appColors.dart';
 import 'package:ksl/controller/favoriteWordController.dart';
-import 'package:ksl/model/word.dart';
 import 'package:ksl/model/favoriteWord.dart';
-import 'package:ksl/component/loadingEffect.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/component/confirmDialog.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 

@@ -6,7 +6,6 @@ import 'package:ksl/view/account/login.dart';
 import 'package:ksl/component/confirmDialog.dart';
 import 'package:ksl/view/account/profile.dart';
 import 'package:ksl/component/avatar.dart';
-import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/view/feedback.dart';
 import 'package:ksl/view/progresUser.dart';
 import 'package:ksl/view/learnedWordList.dart';

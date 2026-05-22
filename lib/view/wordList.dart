@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:ksl/component/appColors.dart';
 import 'package:ksl/controller/wordController.dart';
-import 'package:ksl/controller/progressController.dart';
 import 'package:ksl/controller/learnedWordController.dart';
 import 'package:ksl/controller/favoriteWordController.dart';
 import 'package:ksl/model/word.dart';
 import 'package:ksl/model/topic.dart';
-import 'package:ksl/component/loadingEffect.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';

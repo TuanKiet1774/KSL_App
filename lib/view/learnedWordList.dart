@@ -9,8 +9,6 @@ import 'package:ksl/view/learnedWordDetail.dart';
 import 'package:ksl/controller/authController.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../component/loadingEffect.dart';
-
 class LearnedWordListScreen extends StatefulWidget {
   const LearnedWordListScreen({super.key});
 

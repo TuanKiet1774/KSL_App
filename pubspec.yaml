@@ -30,6 +30,7 @@ dependencies:
   mediapipe_task_vision: ^0.0.1
   flutter_animate: ^4.5.0
   percent_indicator: ^4.2.3
+  wakelock_plus: ^1.3.4
 
 dev_dependencies:
   flutter_test:
@@ -47,7 +48,7 @@ flutter:
     - assets/SignLanguage.jpg
     - assets/ChuDe.png
     - assets/BaiThi.png
-    - assets/MinhHoa1.jpg
+    - assets/ngonngukyhieu.jpg
     - assets/GirolamoCardano.jpg
     - assets/JuanPablodeBonet.jpg
     - assets/AbbeCharlesMicheldeLEpee.jpg

@@ -15,6 +15,8 @@ class _InformationViewState extends State<InformationView> {
   final GlobalKey _keyWhatIs = GlobalKey();
   final GlobalKey _keyHistory = GlobalKey();
   final GlobalKey _keyCharacteristics = GlobalKey();
+  final GlobalKey _keyExamples = GlobalKey();
+  final GlobalKey _keyWordTypes = GlobalKey();
 
   void _scrollToSection(GlobalKey key) {
     final context = key.currentContext;
@@ -76,6 +78,22 @@ class _InformationViewState extends State<InformationView> {
               onTap: () {
                 Navigator.pop(context);
                 _scrollToSection(_keyCharacteristics);
+              },
+            ),
+            _buildTOCItem(
+              icon: Icons.format_list_bulleted_rounded,
+              title: 'Một số loại từ lược bỏ',
+              onTap: () {
+                Navigator.pop(context);
+                _scrollToSection(_keyWordTypes);
+              },
+            ),
+            _buildTOCItem(
+              icon: Icons.table_chart_rounded,
+              title: 'Một số minh hoạ',
+              onTap: () {
+                Navigator.pop(context);
+                _scrollToSection(_keyExamples);
               },
             ),
             const SizedBox(height: 20),
@@ -166,7 +184,7 @@ class _InformationViewState extends State<InformationView> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: Image.asset(
-                      'assets/MinhHoa1.jpg',
+                      'assets/ngonngukyhieu.jpg',
                       width: double.infinity,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) => Container(
@@ -624,7 +642,7 @@ class _InformationViewState extends State<InformationView> {
                       children: [
                         const WidgetSpan(child: SizedBox(width: 30)),
                         TextSpan(
-                          text: 'Ngôn ngữ ký hiệu có cấu trúc rất khác với ngôn ngữ nói. Nếu như khi nói ta sẽ có cấu trúc là đối tượng + động từ + thành phần phụ, thì đối với ngôn ngữ ký hiệu sẽ làm ký hiệu đề cập đến các đối tượng được nhắc đến, sau đó mới dẫn giải những thông tin liên quan khác. Ví dụ khi muốn nói “Tôi muốn mua 1 thùng sữa”, ta sẽ ký hiệu lần lượt ',
+                          text: 'Ngôn ngữ ký hiệu có cấu trúc rất khác với ngôn ngữ nói. Nếu như khi nói ta sẽ có cấu trúc là đối tượng + động từ + thành phần phụ, thì đối với ngôn ngữ ký hiệu, trong một số trường hợp, ta sẽ làm ký hiệu đề cập đến các đối tượng được nhắc đến, sau đó mới dẫn giải những thông tin liên quan khác. Ví dụ khi muốn nói “Tôi muốn mua 1 thùng sữa”, ta sẽ ký hiệu lần lượt ',
                           style: TextStyle(
                             fontSize: 16,
                             height: 1.6,
@@ -633,7 +651,7 @@ class _InformationViewState extends State<InformationView> {
                           ),
                         ),
                         TextSpan(
-                          text: '“Tôi”, “Thùng sữa”, “1”, “Mua”',
+                          text: '"Tôi", "Mua", "1", "Thùng sữa"',
                           style: TextStyle(
                             fontSize: 16,
                             height: 1.6,
@@ -665,12 +683,283 @@ class _InformationViewState extends State<InformationView> {
                     ),
                   ),
 
+                  const SizedBox(height: 40),
+
+                  // Section 4: Một số loại từ lược bỏ
+                  Container(
+                    key: _keyWordTypes,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.accentOrange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: const Border(
+                        left: BorderSide(color: AppColors.accentOrange, width: 4),
+                      ),
+                    ),
+                    child: const Text(
+                      'Một số loại từ lược bỏ',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryTeal,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  RichText(
+                    textAlign: TextAlign.justify,
+                    text: TextSpan(
+                      children: [
+                        const WidgetSpan(child: SizedBox(width: 30)),
+                        TextSpan(
+                          text: 'Trong ngôn ngữ ký hiệu, một số loại từ thường được lược bỏ để câu trở nên ngắn gọn và tập trung vào nội dung chính. Bảng dưới đây liệt kê các loại từ phổ biến thường bị giản lược cùng khái niệm và ví dụ minh hoạ.',
+                          style: TextStyle(
+                            fontSize: 16,
+                            height: 1.6,
+                            color: AppColors.textDark,
+                            fontFamily: Theme.of(context).textTheme.bodyLarge?.fontFamily,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Tiêu đề bảng
+                  const Text(
+                    'Bảng 1.1. Một số loại từ thường được lược bỏ trong ngôn ngữ ký hiệu',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textDark,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Bảng loại từ lược bỏ
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Table(
+                      border: TableBorder.all(
+                        color: AppColors.primaryTeal.withOpacity(0.3),
+                        width: 1,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      columnWidths: const {
+                        0: FlexColumnWidth(1.0),
+                        1: FlexColumnWidth(2.2),
+                        2: FlexColumnWidth(2.2),
+                      },
+                      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                      children: [
+                        // Header
+                        TableRow(
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryTeal.withOpacity(0.12),
+                          ),
+                          children: const [
+                            _TableCell(text: 'Loại từ', isHeader: true),
+                            _TableCell(text: 'Khái niệm', isHeader: true),
+                            _TableCell(text: 'Ví dụ', isHeader: true),
+                          ],
+                        ),
+                        // Giới từ
+                        TableRow(
+                          decoration: const BoxDecoration(color: Colors.white),
+                          children: const [
+                            _TableCell(text: 'Giới từ'),
+                            _TableCell(text: 'Chỉ quan hệ không gian, thời gian, sở hữu,…', isLeft: true),
+                            _TableCell(text: 'ở, tại, của, cho, với, từ, đến, về, trong, ngoài, trên, dưới,…', isLeft: true),
+                          ],
+                        ),
+                        // Liên từ
+                        TableRow(
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryTeal.withOpacity(0.04),
+                          ),
+                          children: const [
+                            _TableCell(text: 'Liên từ'),
+                            _TableCell(text: 'Nối các từ, cụm từ hoặc mệnh đề lại với nhau.', isLeft: true),
+                            _TableCell(text: 'và, hoặc, nhưng, vì, nên, tuy, mặc dù, nếu, thì, mà,…', isLeft: true),
+                          ],
+                        ),
+                        // Tình thái
+                        TableRow(
+                          decoration: const BoxDecoration(color: Colors.white),
+                          children: const [
+                            _TableCell(text: 'Tình thái'),
+                            _TableCell(text: 'Từ dùng để thể hiện cảm xúc, thái độ, mức độ hoặc đánh giá,…', isLeft: true),
+                            _TableCell(text: 'có thể, cần, nên, phải, hãy, đã, đang, sẽ, vẫn, cũng, chỉ,…', isLeft: true),
+                          ],
+                        ),
+                        // Trợ từ
+                        TableRow(
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryTeal.withOpacity(0.04),
+                          ),
+                          children: const [
+                            _TableCell(text: 'Trợ từ'),
+                            _TableCell(text: 'Từ đi kèm với các từ ngữ khác với tác dụng nhấn mạnh ý…', isLeft: true),
+                            _TableCell(text: 'à, ơi, nhé, nha, thôi, chứ, mà, vậy, thế,…', isLeft: true),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 40),
+
+                  // Section 5: Một số minh hoạ
+                  Container(
+                    key: _keyExamples,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.accentOrange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: const Border(
+                        left: BorderSide(color: AppColors.accentOrange, width: 4),
+                      ),
+                    ),
+                    child: const Text(
+                      'Một số minh hoạ',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryTeal,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  RichText(
+                    textAlign: TextAlign.justify,
+                    text: TextSpan(
+                      children: [
+                        const WidgetSpan(child: SizedBox(width: 30)),
+                        TextSpan(
+                          text: 'Dưới đây là một số ví dụ minh hoạ về sự giản lược trong ngôn ngữ ký hiệu Việt Nam, thể hiện sự khác biệt giữa câu nói thông thường và câu rút gọn được dùng khi ký hiệu.',
+                          style: TextStyle(
+                            fontSize: 16,
+                            height: 1.6,
+                            color: AppColors.textDark,
+                            fontFamily: Theme.of(context).textTheme.bodyLarge?.fontFamily,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Tiêu đề bảng
+                  const Text(
+                    'Bảng 1.2. Một số ví dụ minh hoạ về sự giản lược',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textDark,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Bảng minh hoạ
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Table(
+                      border: TableBorder.all(
+                        color: AppColors.primaryTeal.withOpacity(0.3),
+                        width: 1,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      columnWidths: const {
+                        0: FlexColumnWidth(1),
+                        1: FlexColumnWidth(1),
+                      },
+                      children: [
+                        // Header
+                        TableRow(
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryTeal.withOpacity(0.12),
+                          ),
+                          children: const [
+                            _TableCell(text: 'Câu nói thông thường', isHeader: true),
+                            _TableCell(text: 'Câu rút gọn', isHeader: true),
+                          ],
+                        ),
+                        // Row 1
+                        TableRow(
+                          decoration: const BoxDecoration(color: Colors.white),
+                          children: const [
+                            _TableCell(text: 'Đi học bằng xe đạp'),
+                            _TableCell(text: 'Đi học xe đạp'),
+                          ],
+                        ),
+                        // Row 2
+                        TableRow(
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryTeal.withOpacity(0.04),
+                          ),
+                          children: const [
+                            _TableCell(text: 'Cậu ăn bún hay bánh mì?'),
+                            _TableCell(text: 'Cậu ăn bún bánh mì?'),
+                          ],
+                        ),
+                        // Row 3
+                        TableRow(
+                          decoration: const BoxDecoration(color: Colors.white),
+                          children: const [
+                            _TableCell(text: 'Dù trời có mưa thì tôi vẫn đi học'),
+                            _TableCell(text: 'Trời mưa tôi đi học'),
+                          ],
+                        ),
+                        // Row 4
+                        TableRow(
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryTeal.withOpacity(0.04),
+                          ),
+                          children: const [
+                            _TableCell(text: 'Anh và em đi chơi'),
+                            _TableCell(text: 'Anh em đi chơi'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
                   const SizedBox(height: 80),
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TableCell extends StatelessWidget {
+  final String text;
+  final bool isHeader;
+  final bool isLeft;
+  const _TableCell({required this.text, this.isHeader = false, this.isLeft = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Text(
+        text,
+        textAlign: isLeft ? TextAlign.left : TextAlign.center,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
+          color: isHeader ? AppColors.primaryTeal : AppColors.textDark,
+          height: 1.5,
+        ),
       ),
     );
   }

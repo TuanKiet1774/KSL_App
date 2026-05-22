@@ -1,5 +1,3 @@
-import 'package:ksl/model/question.dart';
-
 class ExamResultModel {
   final String id;
   final String userId;

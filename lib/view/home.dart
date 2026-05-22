@@ -1,9 +1,8 @@
-import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ksl/component/appColors.dart';
 import 'package:ksl/component/navigation.dart';
-import 'package:ksl/view/favorite.dart';
 import 'package:ksl/view/search.dart';
 import 'package:ksl/view/translate.dart';
 import 'package:ksl/view/settings.dart';
@@ -24,39 +23,17 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  UserModel? _user;
   int _selectedIndex = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _loadUserData();
-  }
-
-  Future<void> _loadUserData() async {
-    final user = await AuthController.getSavedUser();
-    if (mounted) {
-      setState(() {
-        _user = user;
-      });
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final List<Widget> pages = [
-      HomeMainContent(user: _user),
-      const SearchView(),
-      const TranslateView(),
-      const SettingsView(),
-    ];
     return WillPopScope(
       onWillPop: () async {
         if (_selectedIndex != 0) {
           setState(() => _selectedIndex = 0);
           return false;
         }
-        
+
         ConfirmDialog.show(
           context,
           title: 'Xác nhận thoát',
@@ -67,49 +44,31 @@ class _HomePageState extends State<HomePage> {
           cancelText: 'Hủy',
           onConfirm: () => SystemNavigator.pop(),
         );
-        
+
         return false;
       },
       child: Scaffold(
-      backgroundColor: AppColors.backgroundCream,
-      bottomNavigationBar: KslNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
+        backgroundColor: AppColors.backgroundCream,
+        bottomNavigationBar: KslNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (index) => setState(() => _selectedIndex = index),
+        ),
+        body: ValueListenableBuilder<UserModel?>(
+          valueListenable: AuthController.userNotifier,
+          builder: (context, user, _) {
+            return IndexedStack(
+              index: _selectedIndex,
+              children: [
+                HomeMainContent(user: user),
+                const SearchView(),
+                const TranslateView(),
+                const SettingsView(),
+              ],
+            );
+          },
+        ),
       ),
-      body: ValueListenableBuilder<UserModel?>(
-        valueListenable: AuthController.userNotifier,
-        builder: (context, user, _) {
-          final List<Widget> pages = [
-            HomeMainContent(user: user),
-            const SearchView(),
-            const TranslateView(),
-            const SettingsView(),
-          ];
-          return AnimatedSwitcher(
-            duration: const Duration(milliseconds: 400),
-            switchInCurve: Curves.easeInOut,
-            switchOutCurve: Curves.easeInOut,
-            transitionBuilder: (Widget child, Animation<double> animation) {
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0.05, 0),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: child,
-                ),
-              );
-            },
-            child: pages[_selectedIndex],
-          );
-        },
-      ),
-    ));
+    );
   }
 }
 
