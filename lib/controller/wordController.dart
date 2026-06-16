@@ -13,19 +13,25 @@ class WordController {
       }
 
       final response = await http.get(
-        Uri.parse('$urlAPI/api/words?topicId=$topicId&page=$page&limit=$limit&sortBy=name&sortOrder=asc'),
+        Uri.parse('$urlAPI/api/words').replace(queryParameters: {
+          'topicId': topicId,
+          'page': '$page',
+          'limit': '$limit',
+          'sortBy': 'name',
+          'sortOrder': 'asc',
+        }),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 && data['success'] == true) {
         final List<dynamic> wordJson = data['data'];
         final List<WordModel> words = wordJson.map((json) => WordModel.fromJson(json)).toList();
-        
+
         return {
           'success': true,
           'data': words
@@ -52,12 +58,15 @@ class WordController {
       }
 
       final response = await http.get(
-        Uri.parse('$urlAPI/api/words?search=$query&limit=20'),
+        Uri.parse('$urlAPI/api/words').replace(queryParameters: {
+          'search': query,
+          'limit': '20',
+        }),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -97,7 +106,7 @@ class WordController {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode({'sentence': sentence}),
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 

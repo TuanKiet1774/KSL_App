@@ -66,7 +66,7 @@ class ProgressController {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -108,7 +108,7 @@ class ProgressController {
           'sessionStart': _sessionStartTime?.toIso8601String(),
           'timestamp': DateTime.now().toIso8601String(),
         }),
-      );
+      ).withTimeout();
 
       // Nếu token không hợp lệ (hết hạn hoặc bị logout từ thiết bị khác)
       if (response.statusCode == 401) {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:ksl/component/appColors.dart';
+import 'package:ksl/component/youtubeFrame.dart';
 import 'package:ksl/model/learnedWord.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:ksl/component/messDialog.dart';
@@ -59,7 +60,7 @@ class _LearnedWordDetailScreenState extends State<LearnedWordDetailScreen> {
             },
             itemCount: widget.learnedWords.length,
             itemBuilder: (context, index) {
-              return _buildWordContent(widget.learnedWords[index]);
+              return _buildWordContent(widget.learnedWords[index], isActive: index == _currentIndex);
             },
           ),
 
@@ -110,11 +111,12 @@ class _LearnedWordDetailScreenState extends State<LearnedWordDetailScreen> {
     );
   }
 
-  Widget _buildWordContent(LearnedWordModel learnedWord) {
+  Widget _buildWordContent(LearnedWordModel learnedWord, {required bool isActive}) {
     final word = learnedWord.wordId;
     if (word == null) return const Center(child: Text("Dữ liệu từ vựng không tồn tại"));
 
-    final bool hasYoutube = word.youtubeLink.isNotEmpty && YoutubePlayer.convertUrlToId(word.youtubeLink) != null;
+    final String? youtubeVideoId = word.youtubeLink.isNotEmpty ? YoutubePlayer.convertUrlToId(word.youtubeLink) : null;
+    final bool hasYoutube = youtubeVideoId != null;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -144,7 +146,25 @@ class _LearnedWordDetailScreenState extends State<LearnedWordDetailScreen> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(21),
                     child: hasYoutube
-                      ? YoutubeFrame(videoUrl: word.youtubeLink)
+                      ? (isActive
+                          ? YoutubeFrame(key: ValueKey(word.id), videoUrl: word.youtubeLink)
+                          : AspectRatio(
+                              aspectRatio: 1,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  CachedNetworkImage(
+                                    imageUrl: 'https://img.youtube.com/vi/$youtubeVideoId/mqdefault.jpg',
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, __, ___) => Container(color: Colors.grey.shade100),
+                                  ),
+                                  Container(color: Colors.black26),
+                                  const Center(
+                                    child: Icon(Icons.play_circle_filled_rounded, color: Colors.white, size: 48),
+                                  ),
+                                ],
+                              ),
+                            ))
                       : (word.media.url.isNotEmpty
                           ? AspectRatio(
                               aspectRatio: 1,
@@ -256,75 +276,5 @@ class _LearnedWordDetailScreenState extends State<LearnedWordDetailScreen> {
     } catch (e) {
       return date.toString();
     }
-  }
-}
-
-class YoutubeFrame extends StatefulWidget {
-  final String videoUrl;
-  const YoutubeFrame({super.key, required this.videoUrl});
-
-  @override
-  State<YoutubeFrame> createState() => _YoutubeFrameState();
-}
-
-class _YoutubeFrameState extends State<YoutubeFrame> {
-  late YoutubePlayerController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    final videoId = YoutubePlayer.convertUrlToId(widget.videoUrl);
-    _controller = YoutubePlayerController(
-      initialVideoId: videoId ?? '',
-      flags: const YoutubePlayerFlags(
-        autoPlay: false,
-        mute: false,
-        disableDragSeek: false,
-        loop: false,
-        isLive: false,
-        forceHD: false,
-        enableCaption: true,
-      ),
-    )..addListener(() {
-      if (mounted) {
-        if (_controller.value.playerState == PlayerState.ended) {
-          _controller.pause();
-        }
-        setState(() {});
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.pause();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return YoutubePlayerBuilder(
-      player: YoutubePlayer(
-        controller: _controller,
-        showVideoProgressIndicator: true,
-        progressIndicatorColor: AppColors.primaryTeal,
-        progressColors: const ProgressBarColors(
-          playedColor: AppColors.primaryTeal,
-          handleColor: AppColors.primaryTeal,
-        ),
-        onEnded: (metaData) {
-          _controller.seekTo(Duration.zero);
-          _controller.pause();
-          if (mounted) setState(() {});
-        },
-      ),
-      builder: (context, player) {
-        return AspectRatio(
-          aspectRatio: 1,
-          child: player,
-        );
-      },
-    );
   }
 }

@@ -298,12 +298,13 @@ class _WordListScreenState extends State<WordListScreen> {
       },
       itemCount: _visibleWords.length,
       itemBuilder: (context, index) {
-        return _buildWordContent(_visibleWords[index]);
+        return _buildWordContent(_visibleWords[index], isActive: index == _currentIndex);
       },
     );
   }
 
-  Widget _buildWordContent(WordModel word) {
+  Widget _buildWordContent(WordModel word, {required bool isActive}) {
+    final String? youtubeVideoId = word.youtubeLink.isNotEmpty ? YoutubePlayer.convertUrlToId(word.youtubeLink) : null;
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Padding(
@@ -314,7 +315,7 @@ class _WordListScreenState extends State<WordListScreen> {
             SizedBox(height: MediaQuery.of(context).padding.top + 80),
             
             // Media Section (Nhỏ lại và có Border)
-            if (word.media.url.isNotEmpty)
+            if (word.media.url.isNotEmpty || youtubeVideoId != null)
               Center(
                 child: Container(
                   width: MediaQuery.of(context).size.width * 0.85,
@@ -332,8 +333,26 @@ class _WordListScreenState extends State<WordListScreen> {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(21),
-                    child: word.youtubeLink.isNotEmpty && YoutubePlayer.convertUrlToId(word.youtubeLink) != null
-                      ? YoutubeFrame(videoUrl: word.youtubeLink, aspectRatio: 1)
+                    child: youtubeVideoId != null
+                      ? (isActive
+                          ? YoutubeFrame(key: ValueKey(word.id), videoUrl: word.youtubeLink, aspectRatio: 1)
+                          : AspectRatio(
+                              aspectRatio: 1,
+                              child: Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  CachedNetworkImage(
+                                    imageUrl: 'https://img.youtube.com/vi/$youtubeVideoId/mqdefault.jpg',
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, __, ___) => Container(color: Colors.grey.shade100),
+                                  ),
+                                  Container(color: Colors.black26),
+                                  const Center(
+                                    child: Icon(Icons.play_circle_filled_rounded, color: Colors.white, size: 48),
+                                  ),
+                                ],
+                              ),
+                            ))
                       : Stack(
                           alignment: Alignment.center,
                           children: [

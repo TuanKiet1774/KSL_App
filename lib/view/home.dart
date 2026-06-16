@@ -176,7 +176,7 @@ class HomeMainContent extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Tiếng nói của người Điếc\nNgôn ngữ ký hiệu là gì ?',
+                          'Tiếng nói của người khiếm thính\nNgôn ngữ ký hiệu là gì ?',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 18,

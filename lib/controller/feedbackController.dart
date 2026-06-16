@@ -31,7 +31,7 @@ class FeedbackController {
           'rating': rating,
           'comment': comment,
         }),
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -67,7 +67,7 @@ class FeedbackController {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 

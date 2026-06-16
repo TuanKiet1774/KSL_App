@@ -15,12 +15,15 @@ class TopicController {
       }
 
       final response = await http.get(
-        Uri.parse('$urlAPI/api/topics?page=$page&limit=$limit'),
+        Uri.parse('$urlAPI/api/topics').replace(queryParameters: {
+          'page': '$page',
+          'limit': '$limit',
+        }),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 

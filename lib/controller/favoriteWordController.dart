@@ -28,7 +28,7 @@ class FavoriteWordController {
           'topicId': topicId,
           'note': note,
         }),
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -61,12 +61,15 @@ class FavoriteWordController {
       }
 
       final response = await http.get(
-        Uri.parse('$urlAPI/api/favorite-words?page=$page&limit=$limit'),
+        Uri.parse('$urlAPI/api/favorite-words').replace(queryParameters: {
+          'page': '$page',
+          'limit': '$limit',
+        }),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -105,7 +108,7 @@ class FavoriteWordController {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -145,7 +148,7 @@ class FavoriteWordController {
         body: jsonEncode({
           'note': note,
         }),
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 

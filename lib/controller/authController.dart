@@ -79,7 +79,7 @@ class AuthController {
           'birthday': birthday,
           'address': address,
         }),
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -145,7 +145,7 @@ class AuthController {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       // Nếu token không hợp lệ (hết hạn hoặc bị logout từ thiết bị khác)
       if (response.statusCode == 401) {
@@ -207,7 +207,7 @@ class AuthController {
           'address': address,
           'avatar': avatar,
         }),
-      );
+      ).withTimeout();
 
       if (response.statusCode != 200) {
         return {
@@ -266,7 +266,7 @@ class AuthController {
           'email': email,
           'newPassword': newPassword,
         }),
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -307,7 +307,7 @@ class AuthController {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       if (response.statusCode == 401) {
         final data = jsonDecode(response.body);
@@ -325,28 +325,32 @@ class AuthController {
 
  
   static void handleSessionExpired(String message) async {
-    if (userNotifier.value == null && !(await isLoggedIn())) return;
+    try {
+      if (userNotifier.value == null && !(await isLoggedIn())) return;
 
-    await logout();
-    
-    final context = navigatorKey.currentContext;
-    if (context != null) {
-      MessDialog.showErrorDialog(
-        context,
-        'Thông báo hệ thống',
-        message,
-        onConfirm: () {
-          navigatorKey.currentState?.pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const LoginPage()),
-            (route) => false,
-          );
-        },
-      );
-    } else {
-      navigatorKey.currentState?.pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const LoginPage()),
-        (route) => false,
-      );
+      await logout();
+
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        MessDialog.showErrorDialog(
+          context,
+          'Thông báo hệ thống',
+          message,
+          onConfirm: () {
+            navigatorKey.currentState?.pushAndRemoveUntil(
+              MaterialPageRoute(builder: (context) => const LoginPage()),
+              (route) => false,
+            );
+          },
+        );
+      } else {
+        navigatorKey.currentState?.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      debugPrint('[AuthController.handleSessionExpired] ERROR: $e');
     }
   }
 }

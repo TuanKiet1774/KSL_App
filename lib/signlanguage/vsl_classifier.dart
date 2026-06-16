@@ -29,7 +29,7 @@ class VSLClassifier {
   // static const double _mean = 0.055;
   // static const double _std  = 0.210;
   static const double _mean = 0.0;   // không normalize
-static const double _std  = 1.0;   // không normalize
+  static const double _std  = 1.0;   // không normalize
   static const int    _size = 224;
 
   bool get isLoaded => _isLoaded;
@@ -110,8 +110,6 @@ static const double _std  = 1.0;   // không normalize
     final output = List.generate(1, (_) => List<double>.filled(_classes.length, 0.0));
     _interpreter!.run(input, output);
     final outputData = Float32List.fromList(output[0].map((e) => e.toDouble()).toList());
-
-    _interpreter!.run(input, output);
 
     print('[VSL] Raw output: ${outputData.sublist(0, 10)}');
     print('[VSL] Output max: ${outputData.reduce((a,b) => a > b ? a : b)}');

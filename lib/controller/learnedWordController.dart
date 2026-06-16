@@ -28,7 +28,7 @@ class LearnedWordController {
           'topicId': topicId,
           'expGained': expGained,
         }),
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -63,16 +63,17 @@ class LearnedWordController {
         return {'success': false, 'message': 'Bạn chưa đăng nhập'};
       }
 
-      String url = '$urlAPI/api/learned-words?page=$page&limit=$limit';
-      if (topicId != null) url += '&topicId=$topicId';
-
       final response = await http.get(
-        Uri.parse(url),
+        Uri.parse('$urlAPI/api/learned-words').replace(queryParameters: {
+          'page': '$page',
+          'limit': '$limit',
+          if (topicId != null) 'topicId': topicId,
+        }),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -110,7 +111,7 @@ class LearnedWordController {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -151,7 +152,7 @@ class LearnedWordController {
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode({'ids': ids}),
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -205,7 +206,7 @@ class LearnedWordController {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 

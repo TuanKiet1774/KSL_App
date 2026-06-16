@@ -95,7 +95,9 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
 
     try {
       await ctrl.dispose();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[RecognitionScreen] Camera dispose error: $e');
+    }
   }
 
   Future<void> _initCamera() async {
@@ -228,7 +230,9 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
 
     try {
       await ctrl.dispose();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[RecognitionScreen] Camera dispose error: $e');
+    }
 
     if (mounted && _isCameraStarted) {
       await _initCamera();

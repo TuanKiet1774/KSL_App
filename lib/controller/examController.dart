@@ -20,7 +20,7 @@ class ExamController {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -60,7 +60,7 @@ class ExamController {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -113,7 +113,7 @@ class ExamController {
           'maxScore': maxScore,
           'timeSpent': timeSpent,
         }),
-      );
+      ).withTimeout();
 
       final data = jsonDecode(response.body);
 
@@ -146,7 +146,7 @@ class ExamController {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = json.decode(response.body);
 
@@ -183,7 +183,7 @@ class ExamController {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = json.decode(response.body);
 
@@ -207,7 +207,7 @@ class ExamController {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-      );
+      ).withTimeout();
 
       final data = json.decode(response.body);
 
