@@ -22,27 +22,38 @@ class RecognitionScreen extends StatefulWidget {
 }
 
 class _RecognitionScreenState extends State<RecognitionScreen> {
-
   static const _channel = MethodChannel('com.ksl.ksl/hand_landmark');
 
   CameraController? _cameraCtrl;
   final VSLClassifier _classifier = VSLClassifier();
 
-  bool _isCameraReady   = false;
-  bool _isModelLoaded   = false;
-  bool _isProcessing    = false;
-  bool _isFrontCamera   = true;
+  bool _isCameraReady = false;
+  bool _isModelLoaded = false;
+  bool _isProcessing = false;
+  bool _isFrontCamera = true;
   bool _isCameraStarted = false;
-  bool _isInitializing  = false;
+  bool _isInitializing = false;
 
   Timer? _frameTimer;
   Timer? _idleTimer;
   static const _idleTimeout = Duration(minutes: 1);
 
+  Timer? _inactivityTimer;
+  static const _inactivityTimeout = Duration(minutes: 3);
+
   List<PredictionResult> _predictions = [];
   Uint8List? _skeletonPreview;
   String _statusMsg = 'Sẵn sàng';
   static const _interval = Duration(milliseconds: 350);
+
+  // ─── Văn bản nhận diện ──────────────────────────────────────────────────
+  final List<String> _recognizedChars = [];
+  String? _holdLabel;
+  DateTime? _holdStartTime;
+  DateTime? _lastSavedTime;
+  static const _holdDuration = Duration(seconds: 1);
+  static const _saveCooldown = Duration(milliseconds: 1500);
+  static const _saveConfidenceThreshold = 0.4;
 
   int _currentMode = 0;
   final TextEditingController _inputController = TextEditingController();
@@ -54,6 +65,7 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
   @override
   void initState() {
     super.initState();
+    _resetInactivityTimer();
     _init();
   }
 
@@ -67,17 +79,23 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
     }
   }
 
+  void _resetInactivityTimer() {
+    WakelockPlus.enable();
+    _inactivityTimer?.cancel();
+    _inactivityTimer = Timer(_inactivityTimeout, () {
+      WakelockPlus.disable();
+    });
+  }
+
   Future<void> _stopCamera() async {
     _frameTimer?.cancel();
     _frameTimer = null;
     _idleTimer?.cancel();
     _idleTimer = null;
-    WakelockPlus.disable();
 
     final ctrl = _cameraCtrl;
     if (ctrl == null) return;
 
-    // Null out state BEFORE disposing so no widget rebuild calls CameraPreview on a disposed controller
     if (mounted) {
       setState(() {
         _cameraCtrl = null;
@@ -86,6 +104,10 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
         _predictions = [];
         _skeletonPreview = null;
         _statusMsg = 'Sẵn sàng';
+        _recognizedChars.clear();
+        _holdLabel = null;
+        _holdStartTime = null;
+        _lastSavedTime = null;
       });
     } else {
       _cameraCtrl = null;
@@ -109,8 +131,11 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
       if (!mounted || !_isCameraStarted) return;
 
       final cam = cameras.firstWhere(
-        (c) => c.lensDirection == (_isFrontCamera
-            ? CameraLensDirection.front : CameraLensDirection.back),
+        (c) =>
+            c.lensDirection ==
+            (_isFrontCamera
+                ? CameraLensDirection.front
+                : CameraLensDirection.back),
         orElse: () => cameras.first,
       );
       ctrl = CameraController(cam, ResolutionPreset.medium, enableAudio: false);
@@ -123,12 +148,14 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
 
       _cameraCtrl = ctrl;
       _frameTimer = Timer.periodic(_interval, (_) {
-        if (_currentMode == 1 && _isModelLoaded && !_isProcessing &&
-            mounted && _cameraCtrl != null) {
+        if (_currentMode == 1 &&
+            _isModelLoaded &&
+            !_isProcessing &&
+            mounted &&
+            _cameraCtrl != null) {
           _processFrame();
         }
       });
-      WakelockPlus.enable();
       _resetIdleTimer();
 
       if (mounted) {
@@ -171,11 +198,14 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
       if (!mounted || _cameraCtrl == null) return;
 
       final skeletonBytes = await _channel.invokeMethod<Uint8List>(
-        'processFrame', {'bytes': bytes},
+        'processFrame',
+        {'bytes': bytes},
       );
       if (!mounted || _cameraCtrl == null) return;
 
       if (skeletonBytes == null) {
+        _holdLabel = null;
+        _holdStartTime = null;
         setState(() {
           _predictions = [];
           _statusMsg = 'Không thấy bàn tay';
@@ -190,21 +220,50 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
       final preds = _classifier.predict(skeletonImage, topK: 3);
       if (!mounted || _cameraCtrl == null) return;
 
+      _updateRecognizedText(preds.first);
+
       _resetIdleTimer();
       setState(() {
-        _predictions     = preds;
+        _predictions = preds;
         _skeletonPreview = skeletonBytes;
-        _statusMsg       = 'Đang nhận dạng...';
+        _statusMsg = 'Đang nhận dạng...';
       });
-
     } catch (e) {
-      // Ignore errors caused by camera being stopped/disposed mid-frame
       if (mounted && _cameraCtrl != null) {
         setState(() => _statusMsg = 'Lỗi: $e');
       }
     } finally {
       _isProcessing = false;
     }
+  }
+
+  void _updateRecognizedText(PredictionResult top) {
+    final now = DateTime.now();
+
+    if (_holdLabel != top.label) {
+      _holdLabel = top.label;
+      _holdStartTime = now;
+    }
+
+    final holdElapsed = now.difference(_holdStartTime ?? now);
+    final conditionMet =
+        top.confidence > _saveConfidenceThreshold ||
+        holdElapsed >= _holdDuration;
+    final cooldownOk =
+        _lastSavedTime == null ||
+        now.difference(_lastSavedTime!) >= _saveCooldown;
+
+    if (conditionMet && cooldownOk) {
+      _recognizedChars.add(top.label);
+      _lastSavedTime = now;
+    }
+  }
+
+  void _removeLastRecognizedChar() {
+    if (_recognizedChars.isEmpty) return;
+    setState(() {
+      _recognizedChars.removeLast();
+    });
   }
 
   Future<void> _flipCamera() async {
@@ -271,6 +330,7 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
   void dispose() {
     _frameTimer?.cancel();
     _idleTimer?.cancel();
+    _inactivityTimer?.cancel();
     WakelockPlus.disable();
     _cameraCtrl?.dispose();
     _classifier.dispose();
@@ -282,127 +342,144 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundCream,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(kToolbarHeight + 70),
-        child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.primaryTeal, Color(0xFF236B65)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(40),
-              bottomRight: Radius.circular(40),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Color(0x3A1A4D49),
-                blurRadius: 10,
-                offset: Offset(0, 4),
+    return Listener(
+      onPointerDown: (_) => _resetInactivityTimer(),
+      child: Scaffold(
+        backgroundColor: AppColors.backgroundCream,
+        appBar: PreferredSize(
+          preferredSize: const Size.fromHeight(kToolbarHeight + 70),
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppColors.primaryTeal, Color(0xFF236B65)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-            ],
-          ),
-          child: AppBar(
-            title: const Text(
-              'Dịch ký hiệu',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.3,
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(40),
+                bottomRight: Radius.circular(40),
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x3A1A4D49),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ],
             ),
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            centerTitle: true,
-            actions: [
-              if (_currentMode == 1 && _isCameraStarted)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.flip_camera_ios_rounded, color: Colors.white, size: 22),
-                      tooltip: 'Lật camera',
-                      onPressed: _flipCamera,
+            child: AppBar(
+              title: const Text(
+                'Dịch ký hiệu',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              centerTitle: true,
+              actions: [
+                if (_currentMode == 1 && _isCameraStarted)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.flip_camera_ios_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                        tooltip: 'Lật camera',
+                        onPressed: _flipCamera,
+                      ),
                     ),
                   ),
+                const SizedBox(width: 4),
+              ],
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(70),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+                  child: _buildModeSwitcher(),
                 ),
-              const SizedBox(width: 4),
-            ],
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(70),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
-                child: _buildModeSwitcher(),
               ),
             ),
           ),
         ),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeIn,
+        body: Column(
+          children: [
+            Expanded(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeIn,
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.04),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                ),
+                child: _currentMode == 1
+                    ? Padding(
+                        key: const ValueKey('recognition'),
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 350),
+                          transitionBuilder: (child, anim) =>
+                              FadeTransition(opacity: anim, child: child),
+                          child: _isCameraStarted
+                              ? KeyedSubtree(
+                                  key: const ValueKey('cam'),
+                                  child: _buildCamera(),
+                                )
+                              : KeyedSubtree(
+                                  key: const ValueKey('placeholder'),
+                                  child: _buildCameraPlaceholder(),
+                                ),
+                        ),
+                      )
+                    : KeyedSubtree(
+                        key: const ValueKey('guide'),
+                        child: _buildGuideView(),
+                      ),
+              ),
+            ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 380),
               transitionBuilder: (child, animation) => FadeTransition(
                 opacity: animation,
                 child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, 0.04),
-                    end: Offset.zero,
-                  ).animate(animation),
+                  position:
+                      Tween<Offset>(
+                        begin: const Offset(0, 1.0),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        ),
+                      ),
                   child: child,
                 ),
               ),
-              child: _currentMode == 1
-                  ? Padding(
-                      key: const ValueKey('recognition'),
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 350),
-                        transitionBuilder: (child, anim) => FadeTransition(
-                          opacity: anim,
-                          child: child,
-                        ),
-                        child: _isCameraStarted
-                            ? KeyedSubtree(key: const ValueKey('cam'), child: _buildCamera())
-                            : KeyedSubtree(key: const ValueKey('placeholder'), child: _buildCameraPlaceholder()),
-                      ),
+              child: (_currentMode == 1 && _isCameraStarted)
+                  ? KeyedSubtree(
+                      key: const ValueKey('panel'),
+                      child: _buildResultPanel(),
                     )
-                  : KeyedSubtree(
-                      key: const ValueKey('guide'),
-                      child: _buildGuideView(),
-                    ),
+                  : const SizedBox.shrink(key: ValueKey('nopanel')),
             ),
-          ),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 380),
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0, 1.0),
-                  end: Offset.zero,
-                ).animate(CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeOutCubic,
-                )),
-                child: child,
-              ),
-            ),
-            child: (_currentMode == 1 && _isCameraStarted)
-                ? KeyedSubtree(key: const ValueKey('panel'), child: _buildResultPanel())
-                : const SizedBox.shrink(key: ValueKey('nopanel')),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -431,10 +508,16 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
       child: GestureDetector(
         onTap: () {
           if (index == 0) {
-            setState(() { _currentMode = 0; _statusMsg = 'Sẵn sàng'; });
+            setState(() {
+              _currentMode = 0;
+              _statusMsg = 'Sẵn sàng';
+            });
             _stopCamera();
           } else {
-            setState(() { _currentMode = 1; _statusMsg = 'Sẵn sàng'; });
+            setState(() {
+              _currentMode = 1;
+              _statusMsg = 'Sẵn sàng';
+            });
           }
         },
         child: AnimatedContainer(
@@ -445,7 +528,13 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
             color: isActive ? Colors.white : Colors.transparent,
             borderRadius: BorderRadius.circular(11),
             boxShadow: isActive
-                ? [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 6, offset: const Offset(0, 2))]
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
                 : null,
           ),
           child: Row(
@@ -454,13 +543,17 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
               Icon(
                 icon,
                 size: 16,
-                color: isActive ? AppColors.primaryTeal : Colors.white.withOpacity(0.85),
+                color: isActive
+                    ? AppColors.primaryTeal
+                    : Colors.white.withOpacity(0.85),
               ),
               const SizedBox(width: 6),
               Text(
                 label,
                 style: TextStyle(
-                  color: isActive ? AppColors.primaryTeal : Colors.white.withOpacity(0.85),
+                  color: isActive
+                      ? AppColors.primaryTeal
+                      : Colors.white.withOpacity(0.85),
                   fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                   fontSize: 13,
                 ),
@@ -506,7 +599,11 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                         color: AppColors.primaryTeal.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.edit_note_rounded, size: 18, color: AppColors.primaryTeal),
+                      child: const Icon(
+                        Icons.edit_note_rounded,
+                        size: 18,
+                        color: AppColors.primaryTeal,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     const Text(
@@ -524,7 +621,9 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                   decoration: BoxDecoration(
                     color: AppColors.backgroundCream,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.primaryTeal.withOpacity(0.15)),
+                    border: Border.all(
+                      color: AppColors.primaryTeal.withOpacity(0.15),
+                    ),
                   ),
                   child: TextField(
                     controller: _inputController,
@@ -536,7 +635,10 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                     ),
                     decoration: InputDecoration(
                       hintText: 'Ví dụ: Xin chào, bạn khỏe không?',
-                      hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                      hintStyle: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 14,
+                      ),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.all(16),
                     ),
@@ -544,8 +646,12 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                 ),
                 const SizedBox(height: 16),
                 _buildGradientButton(
-                  label: _isAnalyzing ? 'Đang phân tích...' : 'Hướng dẫn ký hiệu',
-                  icon: _isAnalyzing ? Icons.hourglass_empty_rounded : Icons.play_circle_outline_rounded,
+                  label: _isAnalyzing
+                      ? 'Đang phân tích...'
+                      : 'Hướng dẫn ký hiệu',
+                  icon: _isAnalyzing
+                      ? Icons.hourglass_empty_rounded
+                      : Icons.play_circle_outline_rounded,
                   onTap: _isAnalyzing ? () {} : _analyzeSignLanguage,
                 ),
               ],
@@ -607,7 +713,11 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
           Text(
             'Nhập nội dung ở trên và nhấn nút để xem video hoặc ảnh động hướng dẫn thực hiện ký hiệu thủ ngữ tương ứng.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 13, height: 1.6),
+            style: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: 13,
+              height: 1.6,
+            ),
           ),
         ],
       ),
@@ -676,7 +786,11 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
               color: Colors.red.shade50,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.error_outline_rounded, color: Colors.red.shade400, size: 20),
+            child: Icon(
+              Icons.error_outline_rounded,
+              color: Colors.red.shade400,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -701,7 +815,9 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
     for (final w in words) {
       final wMap = w as Map<String, dynamic>;
       if (wMap['found'] == true && wMap['data'] != null) {
-        foundWords.add(WordModel.fromJson(wMap['data'] as Map<String, dynamic>));
+        foundWords.add(
+          WordModel.fromJson(wMap['data'] as Map<String, dynamic>),
+        );
         foundIndices.add(foundWords.length - 1);
       } else {
         foundIndices.add(-1);
@@ -737,8 +853,11 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                       color: AppColors.primaryTeal.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.compare_arrows_rounded,
-                        size: 18, color: AppColors.primaryTeal),
+                    child: const Icon(
+                      Icons.compare_arrows_rounded,
+                      size: 18,
+                      color: AppColors.primaryTeal,
+                    ),
                   ),
                   const SizedBox(width: 10),
                   const Text(
@@ -766,7 +885,10 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
               const SizedBox(height: 6),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(12),
@@ -786,8 +908,11 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
               Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
-                  child: Icon(Icons.keyboard_arrow_down_rounded,
-                      size: 28, color: AppColors.primaryTeal.withOpacity(0.5)),
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 28,
+                    color: AppColors.primaryTeal.withOpacity(0.5),
+                  ),
                 ),
               ),
 
@@ -808,17 +933,26 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                 children: List.generate(signSequence.length, (index) {
                   final word = signSequence[index].toString();
                   final wordData = words.firstWhere(
-                        (w) => w['word'].toString().toLowerCase() == word.toLowerCase(),
-                    orElse: () => <String, dynamic>{'displayWord': word, 'found': false},
+                    (w) =>
+                        w['word'].toString().toLowerCase() ==
+                        word.toLowerCase(),
+                    orElse: () => <String, dynamic>{
+                      'displayWord': word,
+                      'found': false,
+                    },
                   );
-                  final displayWord = (wordData['displayWord'] ?? word).toString();
+                  final displayWord = (wordData['displayWord'] ?? word)
+                      .toString();
                   final isFound = wordData['found'] == true;
 
                   return Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         decoration: BoxDecoration(
                           color: isFound
                               ? AppColors.primaryTeal.withOpacity(0.1)
@@ -836,7 +970,9 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                             Text(
                               '${index + 1}',
                               style: TextStyle(
-                                color: isFound ? AppColors.primaryTeal : Colors.grey.shade400,
+                                color: isFound
+                                    ? AppColors.primaryTeal
+                                    : Colors.grey.shade400,
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -845,7 +981,9 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                             Text(
                               displayWord.toUpperCase(),
                               style: TextStyle(
-                                color: isFound ? AppColors.primaryTeal : Colors.grey.shade500,
+                                color: isFound
+                                    ? AppColors.primaryTeal
+                                    : Colors.grey.shade500,
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 0.5,
@@ -857,8 +995,11 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                       if (index < signSequence.length - 1)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 2),
-                          child: Icon(Icons.arrow_forward_ios_rounded,
-                              size: 10, color: Colors.grey.shade400),
+                          child: Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 10,
+                            color: Colors.grey.shade400,
+                          ),
                         ),
                     ],
                   );
@@ -872,8 +1013,11 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Icon(Icons.remove_circle_outline_rounded,
-                        size: 14, color: Colors.grey.shade400),
+                    Icon(
+                      Icons.remove_circle_outline_rounded,
+                      size: 14,
+                      color: Colors.grey.shade400,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'Từ lược bỏ: ',
@@ -930,8 +1074,11 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                             color: AppColors.primaryTeal.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: const Icon(Icons.sign_language_rounded,
-                              size: 18, color: AppColors.primaryTeal),
+                          child: const Icon(
+                            Icons.sign_language_rounded,
+                            size: 18,
+                            color: AppColors.primaryTeal,
+                          ),
                         ),
                         const SizedBox(width: 10),
                         const Text(
@@ -946,7 +1093,9 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.primaryTeal.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
@@ -970,7 +1119,11 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                     padding: const EdgeInsets.only(bottom: 4),
                     itemCount: words.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 10),
-                    itemBuilder: (_, i) => _buildWordCard(words[i] as Map<String, dynamic>, foundWords, foundIndices[i]),
+                    itemBuilder: (_, i) => _buildWordCard(
+                      words[i] as Map<String, dynamic>,
+                      foundWords,
+                      foundIndices[i],
+                    ),
                   ),
                 ),
               ],
@@ -981,11 +1134,16 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
     );
   }
 
-  Widget _buildWordCard(Map<String, dynamic> wordResult, List<WordModel> foundWords, int foundIndex) {
+  Widget _buildWordCard(
+    Map<String, dynamic> wordResult,
+    List<WordModel> foundWords,
+    int foundIndex,
+  ) {
     final String rawWord = wordResult['word'] ?? '';
     final String displayWord = wordResult['displayWord'] ?? rawWord;
     final bool found = wordResult['found'] == true;
-    final Map<String, dynamic>? data = wordResult['data'] as Map<String, dynamic>?;
+    final Map<String, dynamic>? data =
+        wordResult['data'] as Map<String, dynamic>?;
 
     WordModel? wordModel;
     if (found && data != null) {
@@ -993,17 +1151,25 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
     }
 
     return GestureDetector(
-      onTap: found && wordModel != null ? () => _showWordDetailSheet(foundWords, foundIndex) : null,
+      onTap: found && wordModel != null
+          ? () => _showWordDetailSheet(foundWords, foundIndex)
+          : null,
       child: Container(
         width: 110,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: found ? AppColors.primaryTeal.withOpacity(0.25) : Colors.grey.shade200,
+            color: found
+                ? AppColors.primaryTeal.withOpacity(0.25)
+                : Colors.grey.shade200,
           ),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 3)),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
           ],
         ),
         child: Column(
@@ -1011,15 +1177,21 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
           children: [
             Expanded(
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(15),
+                ),
                 child: _buildCardThumbnail(wordModel, rawWord),
               ),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
               decoration: BoxDecoration(
-                color: found ? AppColors.primaryTeal.withOpacity(0.04) : Colors.grey.shade50,
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(15)),
+                color: found
+                    ? AppColors.primaryTeal.withOpacity(0.04)
+                    : Colors.grey.shade50,
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(15),
+                ),
               ),
               child: Text(
                 wordModel?.name ?? displayWord,
@@ -1042,7 +1214,8 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
 
   Widget _buildCardThumbnail(WordModel? wordModel, [String rawWord = '']) {
     if (wordModel == null) {
-      final isSingleLetter = rawWord.length == 1 &&
+      final isSingleLetter =
+          rawWord.length == 1 &&
           RegExp(r'^[A-ZĂÂÊÔƠƯĐa-zăâêôơưđ]$').hasMatch(rawWord);
       if (isSingleLetter) {
         return Container(
@@ -1062,7 +1235,11 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
       return Container(
         color: Colors.grey.shade100,
         child: Center(
-          child: Icon(Icons.sign_language_rounded, size: 32, color: Colors.grey.shade300),
+          child: Icon(
+            Icons.sign_language_rounded,
+            size: 32,
+            color: Colors.grey.shade300,
+          ),
         ),
       );
     }
@@ -1078,14 +1255,22 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
           color: AppColors.primaryTeal.withOpacity(0.05),
           child: const Center(
             child: SizedBox(
-              width: 18, height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryTeal),
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.primaryTeal,
+              ),
             ),
           ),
         ),
         errorWidget: (_, __, ___) => Container(
           color: Colors.grey.shade100,
-          child: Icon(Icons.broken_image_rounded, color: Colors.grey.shade300, size: 24),
+          child: Icon(
+            Icons.broken_image_rounded,
+            color: Colors.grey.shade300,
+            size: 24,
+          ),
         ),
       );
     }
@@ -1099,11 +1284,16 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
             CachedNetworkImage(
               imageUrl: 'https://img.youtube.com/vi/$videoId/mqdefault.jpg',
               fit: BoxFit.cover,
-              errorWidget: (_, __, ___) => Container(color: Colors.grey.shade100),
+              errorWidget: (_, __, ___) =>
+                  Container(color: Colors.grey.shade100),
             ),
             Container(color: Colors.black26),
             const Center(
-              child: Icon(Icons.play_circle_filled_rounded, color: Colors.white, size: 28),
+              child: Icon(
+                Icons.play_circle_filled_rounded,
+                color: Colors.white,
+                size: 28,
+              ),
             ),
           ],
         );
@@ -1113,7 +1303,11 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
     return Container(
       color: AppColors.primaryTeal.withOpacity(0.05),
       child: const Center(
-        child: Icon(Icons.sign_language_rounded, size: 32, color: AppColors.primaryTeal),
+        child: Icon(
+          Icons.sign_language_rounded,
+          size: 32,
+          color: AppColors.primaryTeal,
+        ),
       ),
     );
   }
@@ -1124,7 +1318,8 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _WordDetailSheet(words: words, initialIndex: initialIndex),
+      builder: (_) =>
+          _WordDetailSheet(words: words, initialIndex: initialIndex),
     ).then((_) {
       if (mounted) FocusScope.of(context).unfocus();
     });
@@ -1178,67 +1373,71 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
 
   Widget _buildCameraPlaceholder() {
     return SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Container(
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryTeal.withOpacity(0.08),
-                  shape: BoxShape.circle,
-                ),
-                child: Image.asset(
-                  'assets/mayanh.png',
-                  width: 80,
-                  height: 80,
-                  fit: BoxFit.contain,
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Nhận dạng bằng Camera',
-                style: TextStyle(
-                  color: AppColors.primaryBlue,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.2,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  'Khởi động camera và đưa bàn tay trước camera để nhận diện ký hiệu',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 14, height: 1.6),
-                ),
-              ),
-              const SizedBox(height: 28),
-              _buildGradientButton(
-                label: 'Khởi động Camera',
-                icon: Icons.videocam_rounded,
-                onTap: () {
-                  setState(() => _isCameraStarted = true);
-                  _initCamera();
-                },
-              ),
-            ],
-          ),
+      physics: const BouncingScrollPhysics(),
+      child: Container(
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.primaryTeal.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Image.asset(
+                'assets/mayanh.png',
+                width: 80,
+                height: 80,
+                fit: BoxFit.contain,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Nhận dạng bằng Camera',
+              style: TextStyle(
+                color: AppColors.primaryBlue,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.2,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                'Khởi động camera và đưa bàn tay trước camera để nhận diện ký hiệu',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.grey.shade500,
+                  fontSize: 14,
+                  height: 1.6,
+                ),
+              ),
+            ),
+            const SizedBox(height: 28),
+            _buildGradientButton(
+              label: 'Khởi động Camera',
+              icon: Icons.videocam_rounded,
+              onTap: () {
+                setState(() => _isCameraStarted = true);
+                _initCamera();
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1251,33 +1450,33 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
         child: Padding(
           padding: const EdgeInsets.only(top: 40),
           child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.primaryTeal.withOpacity(0.08),
-                shape: BoxShape.circle,
-              ),
-              child: const SizedBox(
-                width: 36,
-                height: 36,
-                child: CircularProgressIndicator(
-                  color: AppColors.primaryTeal,
-                  strokeWidth: 3,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryTeal.withOpacity(0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: const SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: CircularProgressIndicator(
+                    color: AppColors.primaryTeal,
+                    strokeWidth: 3,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Đang khởi tạo camera...',
-              style: TextStyle(
-                color: AppColors.primaryTeal,
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
+              const SizedBox(height: 20),
+              const Text(
+                'Đang khởi tạo camera...',
+                style: TextStyle(
+                  color: AppColors.primaryTeal,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
               ),
-            ),
-          ],
+            ],
           ),
         ),
       );
@@ -1288,111 +1487,114 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
       child: AspectRatio(
         aspectRatio: 1.0,
         child: Stack(
-      children: [
-        // Camera preview
-        Positioned.fill(
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.12),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
+          children: [
+            // Camera preview
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.12),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: _cameraCtrl!.value.previewSize?.height ?? 480,
-                  height: _cameraCtrl!.value.previewSize?.width ?? 640,
-                  child: CameraPreview(_cameraCtrl!),
-                ),
-              ),
-            ),
-          ),
-        ),
-        // Corner frame overlay
-        Positioned.fill(child: _buildCameraFrame()),
-        // LIVE badge – top left
-        Positioned(
-          top: 14,
-          left: 14,
-          child: _buildLiveBadge(),
-        ),
-        // Skeleton preview – below stop button
-        if (_skeletonPreview != null)
-          Positioned(
-            top: 58,
-            right: 14,
-            child: Container(
-              width: 110,
-              height: 110,
-              decoration: BoxDecoration(
-                border: Border.all(color: AppColors.accentOrange, width: 2),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.25),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.memory(_skeletonPreview!, fit: BoxFit.cover),
-              ),
-            ).animate().fadeIn(duration: 200.ms),
-          ),
-        // Stop camera button – top right
-        Positioned(
-          top: 14,
-          right: 14,
-          child: GestureDetector(
-            onTap: _stopCamera,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                color: Colors.red.shade600.withOpacity(0.88),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.red.withOpacity(0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.videocam_off_rounded, color: Colors.white, size: 18),
-                  SizedBox(width: 6),
-                  Text(
-                    'Tắt camera',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: _cameraCtrl!.value.previewSize?.height ?? 480,
+                      height: _cameraCtrl!.value.previewSize?.width ?? 640,
+                      child: CameraPreview(_cameraCtrl!),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-        // Status badge – bottom center
-        Positioned(
-          bottom: 14,
-          left: 0,
-          right: 0,
-          child: Center(child: _buildStatusBadge()),
-        ),
-      ],
+            // Corner frame overlay
+            Positioned.fill(child: _buildCameraFrame()),
+            // LIVE badge – top left
+            Positioned(top: 14, left: 14, child: _buildLiveBadge()),
+            // Skeleton preview – below stop button
+            if (_skeletonPreview != null)
+              Positioned(
+                top: 58,
+                right: 14,
+                child: Container(
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.accentOrange, width: 2),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.memory(_skeletonPreview!, fit: BoxFit.cover),
+                  ),
+                ).animate().fadeIn(duration: 200.ms),
+              ),
+            // Stop camera button – top right
+            Positioned(
+              top: 14,
+              right: 14,
+              child: GestureDetector(
+                onTap: _stopCamera,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade600.withOpacity(0.88),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.videocam_off_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'Tắt camera',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Status badge – bottom center
+            Positioned(
+              bottom: 14,
+              left: 0,
+              right: 0,
+              child: Center(child: _buildStatusBadge()),
+            ),
+          ],
         ),
       ),
     );
@@ -1409,17 +1611,49 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
         child: Stack(
           children: [
             // top-left
-            Positioned(top: 0, left: 0, child: Container(width: arm, height: thick, color: c)),
-            Positioned(top: 0, left: 0, child: Container(width: thick, height: arm, color: c)),
+            Positioned(
+              top: 0,
+              left: 0,
+              child: Container(width: arm, height: thick, color: c),
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              child: Container(width: thick, height: arm, color: c),
+            ),
             // top-right
-            Positioned(top: 0, right: 0, child: Container(width: arm, height: thick, color: c)),
-            Positioned(top: 0, right: 0, child: Container(width: thick, height: arm, color: c)),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(width: arm, height: thick, color: c),
+            ),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: Container(width: thick, height: arm, color: c),
+            ),
             // bottom-left
-            Positioned(bottom: 0, left: 0, child: Container(width: arm, height: thick, color: c)),
-            Positioned(bottom: 0, left: 0, child: Container(width: thick, height: arm, color: c)),
+            Positioned(
+              bottom: 0,
+              left: 0,
+              child: Container(width: arm, height: thick, color: c),
+            ),
+            Positioned(
+              bottom: 0,
+              left: 0,
+              child: Container(width: thick, height: arm, color: c),
+            ),
             // bottom-right
-            Positioned(bottom: 0, right: 0, child: Container(width: arm, height: thick, color: c)),
-            Positioned(bottom: 0, right: 0, child: Container(width: thick, height: arm, color: c)),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(width: arm, height: thick, color: c),
+            ),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(width: thick, height: arm, color: c),
+            ),
           ],
         ),
       ),
@@ -1473,7 +1707,9 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
             width: 6,
             height: 6,
             decoration: BoxDecoration(
-              color: _isModelLoaded ? const Color(0xFF4CAF50) : AppColors.accentOrange,
+              color: _isModelLoaded
+                  ? const Color(0xFF4CAF50)
+                  : AppColors.accentOrange,
               shape: BoxShape.circle,
             ),
           ),
@@ -1562,7 +1798,9 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                 children: [
                   Icon(
                     Icons.bolt_rounded,
-                    color: hasResult ? _confColor(top!.confidence) : Colors.grey.shade400,
+                    color: hasResult
+                        ? _confColor(top!.confidence)
+                        : Colors.grey.shade400,
                     size: 14,
                   ),
                   const SizedBox(width: 4),
@@ -1571,7 +1809,9 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                         ? '${(top!.confidence * 100).toStringAsFixed(0)}% tin cậy'
                         : 'Chờ nhận dạng',
                     style: TextStyle(
-                      color: hasResult ? _confColor(top!.confidence) : Colors.grey.shade400,
+                      color: hasResult
+                          ? _confColor(top!.confidence)
+                          : Colors.grey.shade400,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1606,14 +1846,15 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                 child: Center(
                   child: hasResult
                       ? Text(
-                          top!.label,
-                          style: const TextStyle(
-                            color: AppColors.primaryBlue,
-                            fontSize: 72,
-                            fontWeight: FontWeight.w900,
-                            height: 1.0,
-                          ),
-                        ).animate(key: ValueKey(top.label))
+                              top!.label,
+                              style: const TextStyle(
+                                color: AppColors.primaryBlue,
+                                fontSize: 72,
+                                fontWeight: FontWeight.w900,
+                                height: 1.0,
+                              ),
+                            )
+                            .animate(key: ValueKey(top.label))
                             .scale(
                               begin: const Offset(0.85, 0.85),
                               duration: 180.ms,
@@ -1688,107 +1929,79 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
-          'Các kết quả khác',
-          style: TextStyle(
-            color: Colors.grey,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.3,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Văn bản nhận diện',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.3,
+              ),
+            ),
+            if (_recognizedChars.isNotEmpty)
+              GestureDetector(
+                onTap: _removeLastRecognizedChar,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.backspace_outlined,
+                      size: 13,
+                      color: Colors.grey.shade500,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Xóa',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 10),
-        Row(
-          children: hasResult && _predictions.length > 1
-              ? _predictions.skip(1).map((p) {
-                  return Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey.shade200),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.02),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            p.label,
-                            style: const TextStyle(
-                              color: AppColors.primaryBlue,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: _confColor(p.confidence).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '${(p.confidence * 100).toStringAsFixed(1)}%',
-                              style: TextStyle(
-                                color: _confColor(p.confidence),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+        Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 56),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: _recognizedChars.isEmpty
+              ? Center(
+                  child: Text(
+                    'Ký hiệu sẽ được ghi lại ở đây',
+                    style: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                  ),
+                )
+              : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Text(
+                    _recognizedChars.join(),
+                    style: const TextStyle(
+                      color: AppColors.primaryBlue,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
                     ),
-                  );
-                }).toList()
-              : List.generate(2, (_) {
-                  return Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.grey.shade200),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            '--',
-                            style: TextStyle(
-                              color: Colors.grey.shade300,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '0.0%',
-                              style: TextStyle(
-                                color: Colors.grey.shade400,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
+                  ),
+                ),
         ),
       ],
     );
@@ -1866,7 +2079,9 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
                             children: [
                               _NavButton(
                                 icon: Icons.arrow_back_ios_new_rounded,
-                                onTap: hasPrev ? () => setState(() => _currentIndex--) : null,
+                                onTap: hasPrev
+                                    ? () => setState(() => _currentIndex--)
+                                    : null,
                               ),
                               Expanded(
                                 child: Center(
@@ -1882,12 +2097,15 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
                               ),
                               _NavButton(
                                 icon: Icons.arrow_forward_ios_rounded,
-                                onTap: hasNext ? () => setState(() => _currentIndex++) : null,
+                                onTap: hasNext
+                                    ? () => setState(() => _currentIndex++)
+                                    : null,
                               ),
                             ],
                           ),
                         ),
-                      if (word.media.url.isNotEmpty || word.youtubeLink.isNotEmpty)
+                      if (word.media.url.isNotEmpty ||
+                          word.youtubeLink.isNotEmpty)
                         Container(
                           width: double.infinity,
                           decoration: BoxDecoration(
@@ -1906,8 +2124,12 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(18),
-                            child: word.youtubeLink.isNotEmpty &&
-                                    YoutubePlayer.convertUrlToId(word.youtubeLink) != null
+                            child:
+                                word.youtubeLink.isNotEmpty &&
+                                    YoutubePlayer.convertUrlToId(
+                                          word.youtubeLink,
+                                        ) !=
+                                        null
                                 ? YoutubeFrame(
                                     key: ValueKey(word.id),
                                     videoUrl: word.youtubeLink,
@@ -1921,7 +2143,8 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
                                       fit: BoxFit.cover,
                                       placeholder: (_, __) => Center(
                                         child: CircularProgressIndicator(
-                                          color: AppColors.primaryTeal.withOpacity(0.5),
+                                          color: AppColors.primaryTeal
+                                              .withOpacity(0.5),
                                           strokeWidth: 2,
                                         ),
                                       ),
@@ -1991,10 +2214,14 @@ class _NavButton extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: enabled ? AppColors.primaryTeal.withOpacity(0.1) : Colors.grey.shade100,
+          color: enabled
+              ? AppColors.primaryTeal.withOpacity(0.1)
+              : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: enabled ? AppColors.primaryTeal.withOpacity(0.25) : Colors.grey.shade200,
+            color: enabled
+                ? AppColors.primaryTeal.withOpacity(0.25)
+                : Colors.grey.shade200,
           ),
         ),
         child: Icon(
