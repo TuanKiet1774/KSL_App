@@ -1,6 +1,12 @@
-# KSL — Học & Nhận diện Ngôn ngữ Ký hiệu Việt Nam (VSL)
+# Ứng dụng KSL — Học & Nhận diện Ngôn ngữ Ký hiệu Việt Nam (VSL)
 
-Ứng dụng Flutter hỗ trợ học từ vựng và nhận diện Ngôn ngữ ký hiệu Việt Nam (VSL)
+Ứng dụng KSL hỗ trợ học từ vựng và nhận diện Ngôn ngữ ký hiệu Việt Nam (VSL)
+
+<div align="center">
+  <img width="200" height="200" alt="logoBee" src="assets/Logo.png"/>
+</div>
+
+---
 
 ## Tính năng chính
 
