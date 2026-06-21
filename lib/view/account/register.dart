@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/authController.dart';
+import 'package:ksl/provider/authProvider.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/view/account/login.dart';
 
@@ -105,7 +106,7 @@ class _RegisterPageState extends State<RegisterPage> with SingleTickerProviderSt
       _isLoading = true;
     });
 
-    final result = await AuthController.register(
+    final result = await context.read<AuthProvider>().register(
       username: _usernameController.text.trim(),
       fullname: _fullnameController.text.trim(),
       email: _emailController.text.trim(),

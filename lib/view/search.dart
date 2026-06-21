@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ksl/component/appColors.dart';
 import 'package:ksl/controller/wordController.dart';
 import 'package:ksl/controller/topicController.dart';
-import 'package:ksl/controller/authController.dart';
-import 'package:ksl/controller/learnedWordController.dart';
-import 'package:ksl/controller/progressController.dart';
+import 'package:ksl/provider/authProvider.dart';
+import 'package:ksl/provider/learnedWordProvider.dart';
+import 'package:ksl/provider/progressProvider.dart';
 import 'package:ksl/model/word.dart';
 import 'package:ksl/model/topic.dart';
 import 'package:ksl/model/user.dart';
@@ -68,26 +69,18 @@ class _SearchViewState extends State<SearchView> {
     if (!mounted) return;
     setState(() => _isInitializing = true);
 
+    final authProvider = context.read<AuthProvider>();
+    final progressProvider = context.read<ProgressProvider>();
+
     // Gọi song song 3 API cùng lúc thay vì tuần tự
-    final fetchResults = await Future.wait([
-      AuthController.getProfile(),
-      ProgressController.getUserProgress(),
-      TopicController.getAllTopics(limit: 100),
+    await Future.wait([
+      authProvider.getProfile(),
+      progressProvider.fetchUserProgress(),
     ]);
+    final topicsResult = await TopicController.getAllTopics(limit: 100);
 
-    final profileResult = fetchResults[0];
-    final progressResult = fetchResults[1];
-    final topicsResult = fetchResults[2];
-
-    if (profileResult['success']) {
-      _currentUser = profileResult['user'];
-    } else {
-      _currentUser = await AuthController.getSavedUser();
-    }
-
-    if (progressResult['success']) {
-      _userProgress = progressResult['data'];
-    }
+    _currentUser = authProvider.currentUser;
+    _userProgress = progressProvider.userProgress;
 
     if (topicsResult['success']) {
       _allTopics = topicsResult['data'];
@@ -197,7 +190,7 @@ class _SearchViewState extends State<SearchView> {
       
       // Đánh dấu đã học nếu chưa học
       if (!word.isLearned) {
-        final result = await LearnedWordController.markAsLearned(
+        final result = await context.read<LearnedWordProvider>().markAsLearned(
           wordId: word.id,
           topicId: topic.id,
           expGained: word.exp,
@@ -207,10 +200,11 @@ class _SearchViewState extends State<SearchView> {
             word.isLearned = true;
           });
           // Cập nhật lại progress sau khi học để đồng bộ EXP
-          final newProgress = await ProgressController.getUserProgress();
-          if (mounted && newProgress['success']) {
+          final progressProvider = context.read<ProgressProvider>();
+          await progressProvider.fetchUserProgress();
+          if (mounted) {
             setState(() {
-              _userProgress = newProgress['data'];
+              _userProgress = progressProvider.userProgress;
             });
           }
         }

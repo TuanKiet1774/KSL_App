@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/authController.dart';
+import 'package:ksl/provider/authProvider.dart';
 import 'package:ksl/model/user.dart';
 import 'package:ksl/component/avatar.dart';
 import 'package:ksl/view/account/editProfile.dart';
@@ -122,7 +123,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                         if (passwordController.text.isEmpty) return;
                                         setDialogState(() => isVerifying = true);
                                         
-                                        final result = await AuthController.login(_user!.username, passwordController.text);
+                                        final result = await context.read<AuthProvider>().login(_user!.username, passwordController.text);
                                         
                                         if (mounted) {
                                           setDialogState(() => isVerifying = false);
@@ -173,7 +174,7 @@ class _ProfilePageState extends State<ProfilePage> {
       _errorMessage = null;
     });
 
-    final result = await AuthController.getProfile();
+    final result = await context.read<AuthProvider>().getProfile();
 
     if (mounted) {
       setState(() {
@@ -227,7 +228,7 @@ class _ProfilePageState extends State<ProfilePage> {
               child: const Icon(Icons.edit_rounded, color: Colors.white, size: 20),
             ),
             onPressed: () {
-              if (AuthController.userNotifier.value != null) {
+              if (context.read<AuthProvider>().currentUser != null) {
                 _showPasswordDialog();
               }
             },
@@ -239,13 +240,12 @@ class _ProfilePageState extends State<ProfilePage> {
           ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
           : _errorMessage != null
               ? _buildErrorView()
-              : ValueListenableBuilder<UserModel?>(
-                  valueListenable: AuthController.userNotifier,
-                  builder: (context, user, _) {
+              : Consumer<AuthProvider>(
+                  builder: (context, authProvider, _) {
                     return MediaQuery.removePadding(
                       context: context,
                       removeTop: true,
-                      child: _buildProfileContent(user),
+                      child: _buildProfileContent(authProvider.currentUser),
                     );
                   },
                 ),
@@ -458,7 +458,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                             if (currentPasswordController.text.isEmpty) return;
                                             
                                             setDialogState(() => isLoading = true);
-                                            final result = await AuthController.login(_user!.username, currentPasswordController.text);
+                                            final result = await context.read<AuthProvider>().login(_user!.username, currentPasswordController.text);
                                             
                                             if (mounted) {
                                               setDialogState(() => isLoading = false);
@@ -486,7 +486,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                           }
 
                                           setDialogState(() => isLoading = true);
-                                          final result = await AuthController.changePassword(
+                                          final result = await context.read<AuthProvider>().changePassword(
                                             currentPassword: currentPasswordController.text,
                                             username: usernameController.text.trim(),
                                             email: emailController.text.trim(),

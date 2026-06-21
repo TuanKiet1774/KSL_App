@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/favoriteWordController.dart';
+import 'package:ksl/provider/favoriteWordProvider.dart';
 import 'package:ksl/model/favoriteWord.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/component/confirmDialog.dart';
@@ -15,22 +16,17 @@ class FavoriteView extends StatefulWidget {
 }
 
 class _FavoriteViewState extends State<FavoriteView> {
-  List<FavoriteWordModel> _favorites = [];
-  bool _isLoading = true;
   bool _isSelectionMode = false;
   final Set<String> _selectedWordIds = {};
-  
+
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
 
-  int _currentPage = 1;
-  final int _limit = 50;
-
   @override
   void initState() {
     super.initState();
-    _fetchFavorites();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchFavorites());
   }
 
   @override
@@ -41,29 +37,17 @@ class _FavoriteViewState extends State<FavoriteView> {
 
   Future<void> _fetchFavorites() async {
     setState(() {
-      _isLoading = true;
       _isSelectionMode = false;
       _selectedWordIds.clear();
     });
-    final result = await FavoriteWordController.getMyFavorites(page: _currentPage, limit: _limit);
-    if (mounted) {
-      setState(() {
-        if (result['success']) {
-          _favorites = result['data'];
-        }
-        _isLoading = false;
-      });
-    }
+    await context.read<FavoriteWordProvider>().fetchFavorites();
   }
 
   Future<void> _removeSingleFavorite(String wordId, int index) async {
-    final result = await FavoriteWordController.removeFromFavorite(wordId);
+    final provider = context.read<FavoriteWordProvider>();
+    final result = await provider.removeFromFavorite(wordId);
     if (mounted) {
       if (result['success']) {
-        setState(() {
-          _favorites.removeAt(index);
-          _favorites = List.from(_favorites);
-        });
         MessDialog.showSuccessDialog(context, 'Thành công', 'Đã xóa khỏi yêu thích');
       } else {
         MessDialog.showErrorDialog(context, 'Lỗi', result['message']);
@@ -73,11 +57,11 @@ class _FavoriteViewState extends State<FavoriteView> {
   }
 
   Future<void> _removeMultipleFavorites() async {
-    setState(() => _isLoading = true);
-    
+    final provider = context.read<FavoriteWordProvider>();
+
     int successCount = 0;
     for (var wordId in _selectedWordIds) {
-      final result = await FavoriteWordController.removeFromFavorite(wordId);
+      final result = await provider.removeFromFavorite(wordId);
       if (result['success']) successCount++;
     }
 
@@ -99,9 +83,9 @@ class _FavoriteViewState extends State<FavoriteView> {
     );
   }
 
-  List<FavoriteWordModel> get _filteredFavorites {
-    if (_searchQuery.isEmpty) return _favorites;
-    return _favorites.where((f) {
+  List<FavoriteWordModel> _filteredFavorites(List<FavoriteWordModel> favorites) {
+    if (_searchQuery.isEmpty) return favorites;
+    return favorites.where((f) {
       final name = f.wordId?.name.toLowerCase() ?? "";
       final note = f.note.toLowerCase();
       return name.contains(_searchQuery.toLowerCase()) || note.contains(_searchQuery.toLowerCase());
@@ -110,6 +94,10 @@ class _FavoriteViewState extends State<FavoriteView> {
 
   @override
   Widget build(BuildContext context) {
+    final favoriteProvider = context.watch<FavoriteWordProvider>();
+    final favorites = favoriteProvider.favorites;
+    final filteredFavorites = _filteredFavorites(favorites);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
@@ -157,12 +145,12 @@ class _FavoriteViewState extends State<FavoriteView> {
           },
         ),
         actions: [
-          if (!_isSelectionMode && !_isSearching && _favorites.isNotEmpty)
+          if (!_isSelectionMode && !_isSearching && favorites.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.search_rounded, color: Colors.white),
               onPressed: () => setState(() => _isSearching = true),
             ),
-          if (_favorites.isNotEmpty && !_isSearching)
+          if (favorites.isNotEmpty && !_isSearching)
             IconButton(
               icon: Icon(_isSelectionMode ? Icons.select_all_rounded : Icons.edit_note_rounded, color: Colors.white),
               onPressed: () {
@@ -170,10 +158,10 @@ class _FavoriteViewState extends State<FavoriteView> {
                   if (!_isSelectionMode) {
                     _isSelectionMode = true;
                   } else {
-                    if (_selectedWordIds.length == _favorites.length) {
+                    if (_selectedWordIds.length == favorites.length) {
                       _selectedWordIds.clear();
                     } else {
-                      _selectedWordIds.addAll(_favorites.map((f) => f.wordId?.id ?? ''));
+                      _selectedWordIds.addAll(favorites.map((f) => f.wordId?.id ?? ''));
                       _selectedWordIds.remove('');
                     }
                   }
@@ -188,11 +176,11 @@ class _FavoriteViewState extends State<FavoriteView> {
             children: [
               if (!_isSearching) _buildHeader(),
               Expanded(
-                child: _isLoading
+                child: favoriteProvider.isLoading
                     ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
-                    : _filteredFavorites.isEmpty
+                    : filteredFavorites.isEmpty
                         ? _buildEmptyState()
-                        : _buildFavoriteList(),
+                        : _buildFavoriteList(filteredFavorites),
               ),
             ],
           ),
@@ -287,8 +275,7 @@ class _FavoriteViewState extends State<FavoriteView> {
     );
   }
 
-  Widget _buildFavoriteList() {
-    final list = _filteredFavorites;
+  Widget _buildFavoriteList(List<FavoriteWordModel> list) {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
       itemCount: list.length,
@@ -438,19 +425,7 @@ class _FavoriteViewState extends State<FavoriteView> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _WordDetailSheet(
-        favorite: favorite,
-        onUpdate: (updatedFavorite) {
-          setState(() {
-            int index = _favorites.indexWhere((f) => f.id == updatedFavorite.id);
-            if (index != -1) {
-              List<FavoriteWordModel> newList = List.from(_favorites);
-              newList[index] = updatedFavorite;
-              _favorites = newList;
-            }
-          });
-        },
-      ),
+      builder: (context) => _WordDetailSheet(favorite: favorite),
     );
   }
 
@@ -468,8 +443,7 @@ class _FavoriteViewState extends State<FavoriteView> {
 
 class _WordDetailSheet extends StatefulWidget {
   final FavoriteWordModel favorite;
-  final Function(FavoriteWordModel) onUpdate;
-  const _WordDetailSheet({required this.favorite, required this.onUpdate});
+  const _WordDetailSheet({required this.favorite});
 
   @override
   State<_WordDetailSheet> createState() => _WordDetailSheetState();
@@ -516,10 +490,9 @@ class _WordDetailSheetState extends State<_WordDetailSheet> {
           ElevatedButton(
             onPressed: () async {
               final newNote = controller.text;
-              final result = await FavoriteWordController.updateFavoriteNote(widget.favorite.id, newNote);
+              final result = await context.read<FavoriteWordProvider>().updateFavoriteNote(widget.favorite.id, newNote);
               if (result['success']) {
                 setState(() => _currentNote = newNote);
-                widget.onUpdate(result['data']);
                 if (mounted) Navigator.pop(context);
               } else {
                 if (mounted) MessDialog.showErrorDialog(context, 'Lỗi', result['message']);

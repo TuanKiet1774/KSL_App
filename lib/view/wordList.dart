@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/wordController.dart';
-import 'package:ksl/controller/learnedWordController.dart';
-import 'package:ksl/controller/favoriteWordController.dart';
+import 'package:ksl/provider/wordProvider.dart';
+import 'package:ksl/provider/learnedWordProvider.dart';
+import 'package:ksl/provider/favoriteWordProvider.dart';
 import 'package:ksl/model/word.dart';
 import 'package:ksl/model/topic.dart';
 import 'package:ksl/component/messDialog.dart';
@@ -11,6 +12,7 @@ import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ksl/component/youtubeFrame.dart';
+import 'package:ksl/provider/authProvider.dart';
 
 class WordListScreen extends StatefulWidget {
   final TopicModel topic;
@@ -22,17 +24,10 @@ class WordListScreen extends StatefulWidget {
 }
 
 class _WordListScreenState extends State<WordListScreen> {
-  List<WordModel> _visibleWords = []; // Các từ đang hiển thị trong PageView
-  bool _isLoading = true;
-  String _errorMessage = "";
   final PageController _pageController = PageController();
   int _currentIndex = 0;
-  
-  int _currentPage = 1;
-  final int _batchSize = 10;
-  final int _threshold = 5; 
-  bool _hasMore = true;
-  bool _isFetchingMore = false;
+
+  final int _threshold = 5;
 
   @override
   void initState() {
@@ -53,66 +48,18 @@ class _WordListScreenState extends State<WordListScreen> {
   }
 
   Future<void> _fetchWords({int targetIndex = 0}) async {
+    final provider = context.read<WordProvider>();
+    await provider.loadTopicWordsUntilIndex(widget.topic.id, targetIndex);
     if (!mounted) return;
-    
-    setState(() {
-      _isLoading = true;
-      _errorMessage = "";
-      _visibleWords = [];
-      _currentIndex = 0;
-      _currentPage = 0;
-      _hasMore = true;
-    });
 
-    bool success = false;
-    // Load các batch cho đến khi đạt được targetIndex hoặc hết dữ liệu
-    while (_visibleWords.length <= targetIndex && _hasMore) {
-      final result = await WordController.getWordsByTopic(widget.topic.id, page: _currentPage + 1, limit: _batchSize);
-      
-      if (mounted) {
-        if (result['success']) {
-          final List<WordModel> newWords = result['data'];
-          if (newWords.isEmpty) {
-            _hasMore = false;
-            break;
-          }
-          
-          _visibleWords.addAll(newWords);
-          
-          if (newWords.length < _batchSize) {
-            _hasMore = false;
-          } else {
-            _currentPage++;
-          }
-          success = true;
-        } else {
-          setState(() {
-            _errorMessage = result['message'];
-            _isLoading = false;
-          });
-          return;
-        }
-      } else {
-        return;
+    final words = provider.topicWords;
+    if (provider.topicWordsError.isEmpty) {
+      if (targetIndex >= words.length) {
+        targetIndex = words.isEmpty ? 0 : words.length - 1;
       }
-    }
-
-    if (mounted && success) {
-      // Đảm bảo targetIndex không vượt quá số từ hiện có
-      if (targetIndex >= _visibleWords.length) {
-        targetIndex = _visibleWords.isEmpty ? 0 : _visibleWords.length - 1;
-      }
-
       _currentIndex = targetIndex;
-      
-      // Tải ảnh ngầm cho batch hiện tại
-      _precacheImages(_visibleWords);
-      
-      setState(() {
-        _isLoading = false;
-      });
+      _precacheImages(words);
 
-      // Jump to page sau khi UI build xong
       if (targetIndex > 0) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_pageController.hasClients) {
@@ -136,64 +83,37 @@ class _WordListScreenState extends State<WordListScreen> {
     }
   }
 
-  Future<void> _loadNextBatch() async {
-    if (!_hasMore || _isFetchingMore) return;
-
-    _isFetchingMore = true;
-    final int nextPage = _currentPage + 1;
-
-    final result = await WordController.getWordsByTopic(widget.topic.id, page: nextPage, limit: _batchSize);
-    
-    if (mounted) {
-      if (result['success']) {
-        final List<WordModel> nextWords = result['data'];
-        if (nextWords.isNotEmpty) {
-          setState(() {
-            _visibleWords.addAll(nextWords);
-            _currentPage = nextPage;
-            if (nextWords.length < _batchSize) {
-              _hasMore = false;
-            }
-          });
-          _precacheImages(nextWords);
-        } else {
-          _hasMore = false;
-        }
-      }
-      _isFetchingMore = false;
-    }
-  }
-
-
   Future<void> _markAsLearned(int index) async {
-    if (index >= _visibleWords.length) return;
-    final word = _visibleWords[index];
-    await LearnedWordController.markAsLearned(
+    final words = context.read<WordProvider>().topicWords;
+    if (index >= words.length) return;
+    final word = words[index];
+    final result = await context.read<LearnedWordProvider>().markAsLearned(
       wordId: word.id,
       topicId: widget.topic.id,
       expGained: word.exp,
     );
+    if (mounted && result['success'] == true) {
+      context.read<AuthProvider>().getProfile();
+    }
   }
 
   Future<void> _toggleFavorite(WordModel word) async {
+    final favoriteProvider = context.read<FavoriteWordProvider>();
+    final wordProvider = context.read<WordProvider>();
     if (word.isFavorite) {
-      final result = await FavoriteWordController.removeFromFavorite(word.id);
+      final result = await favoriteProvider.removeFromFavorite(word.id);
       if (result['success']) {
-        setState(() {
-          word.isFavorite = false;
-        });
+        wordProvider.setTopicWordFavorite(word.id, false);
       } else {
         if (mounted) MessDialog.showErrorDialog(context, 'Lỗi', result['message']);
       }
     } else {
-      final result = await FavoriteWordController.addToFavorite(
+      final result = await favoriteProvider.addToFavorite(
         wordId: word.id,
         topicId: widget.topic.id,
       );
       if (result['success']) {
-        setState(() {
-          word.isFavorite = true;
-        });
+        wordProvider.setTopicWordFavorite(word.id, true);
       } else {
         if (mounted) MessDialog.showErrorDialog(context, 'Lỗi', result['message']);
       }
@@ -208,8 +128,9 @@ class _WordListScreenState extends State<WordListScreen> {
   }
 
   void _nextPage() {
-    if (_currentIndex < _visibleWords.length - 1) {
-      _markAsLearned(_currentIndex); 
+    final words = context.read<WordProvider>().topicWords;
+    if (_currentIndex < words.length - 1) {
+      _markAsLearned(_currentIndex);
       _pageController.nextPage(
         duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOutQuart,
@@ -228,6 +149,12 @@ class _WordListScreenState extends State<WordListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final wordProvider = context.watch<WordProvider>();
+    final words = wordProvider.topicWords;
+    final isLoading = wordProvider.isLoadingTopicWords;
+    final errorMessage = wordProvider.topicWordsError;
+    final hasMore = wordProvider.hasMoreTopicWords;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -235,15 +162,15 @@ class _WordListScreenState extends State<WordListScreen> {
           Column(
             children: [
               Expanded(
-                child: _isLoading
+                child: isLoading
                     ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
-                    : _errorMessage.isNotEmpty
-                        ? _buildErrorState()
-                        : _visibleWords.isEmpty
+                    : errorMessage.isNotEmpty
+                        ? _buildErrorState(errorMessage)
+                        : words.isEmpty
                             ? _buildEmptyState()
-                            : _buildWordPageView(),
+                            : _buildWordPageView(words),
               ),
-              if (!_isLoading && _visibleWords.isNotEmpty) _buildNavigationControls(),
+              if (!isLoading && words.isNotEmpty) _buildNavigationControls(words, hasMore),
             ],
           ),
 
@@ -259,14 +186,14 @@ class _WordListScreenState extends State<WordListScreen> {
             ),
           ),
 
-          if (!_isLoading && _visibleWords.isNotEmpty)
+          if (!isLoading && words.isNotEmpty)
             Positioned(
               top: MediaQuery.of(context).padding.top + 22,
               left: 0,
               right: 0,
               child: Center(
                 child: Text(
-                  '${_currentIndex + 1} / ${_visibleWords.length}${_hasMore ? '+' : ''}',
+                  '${_currentIndex + 1} / ${words.length}${hasMore ? '+' : ''}',
                   style: const TextStyle(
                     color: AppColors.primaryBlue,
                     fontWeight: FontWeight.bold,
@@ -280,25 +207,25 @@ class _WordListScreenState extends State<WordListScreen> {
     );
   }
 
-  Widget _buildWordPageView() {
+  Widget _buildWordPageView(List<WordModel> words) {
     return PageView.builder(
       controller: _pageController,
       onPageChanged: (index) {
         if (index > _currentIndex) {
           _markAsLearned(_currentIndex);
         }
-        
+
         setState(() {
           _currentIndex = index;
         });
         _saveLastIndex(index);
-        if (_visibleWords.length - index <= _threshold) {
-          _loadNextBatch();
+        if (words.length - index <= _threshold) {
+          context.read<WordProvider>().loadNextTopicWordBatch(widget.topic.id);
         }
       },
-      itemCount: _visibleWords.length,
+      itemCount: words.length,
       itemBuilder: (context, index) {
-        return _buildWordContent(_visibleWords[index], isActive: index == _currentIndex);
+        return _buildWordContent(words[index], isActive: index == _currentIndex);
       },
     );
   }
@@ -495,7 +422,7 @@ class _WordListScreenState extends State<WordListScreen> {
     );
   }
 
-  Widget _buildNavigationControls() {
+  Widget _buildNavigationControls(List<WordModel> words, bool hasMore) {
     return Container(
       padding: const EdgeInsets.fromLTRB(30, 0, 30, 40),
       color: Colors.white,
@@ -510,9 +437,9 @@ class _WordListScreenState extends State<WordListScreen> {
           const SizedBox(width: 15),
           Expanded(
             child: _buildMainNavButton(
-              label: (_currentIndex == _visibleWords.length - 1 && !_hasMore) ? 'HOÀN THÀNH' : 'TIẾP THEO',
+              label: (_currentIndex == words.length - 1 && !hasMore) ? 'HOÀN THÀNH' : 'TIẾP THEO',
               onTap: () async {
-                if (_currentIndex == _visibleWords.length - 1 && !_hasMore) {
+                if (_currentIndex == words.length - 1 && !hasMore) {
                   await _markAsLearned(_currentIndex);
                   await _saveLastIndex(0); // Đã hoàn thành thì không cần lưu vết (về 0)
                   Navigator.pop(context);
@@ -581,14 +508,14 @@ class _WordListScreenState extends State<WordListScreen> {
     );
   }
 
-  Widget _buildErrorState() {
+  Widget _buildErrorState(String errorMessage) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.error_outline_rounded, size: 80, color: Colors.redAccent),
           const SizedBox(height: 16),
-          Text(_errorMessage, style: const TextStyle(color: Colors.grey)),
+          Text(errorMessage, style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 20),
           ElevatedButton(onPressed: _fetchWords, child: const Text('Thử lại')),
         ],

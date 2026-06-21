@@ -1,9 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ksl/component/appColors.dart';
 import 'package:ksl/view/splash.dart';
 import 'package:ksl/controller/authController.dart';
 import 'package:ksl/controller/progressController.dart';
 import 'package:ksl/component/navigator_key.dart';
+import 'package:ksl/provider/authProvider.dart';
+import 'package:ksl/provider/topicProvider.dart';
+import 'package:ksl/provider/wordProvider.dart';
+import 'package:ksl/provider/examProvider.dart';
+import 'package:ksl/provider/favoriteWordProvider.dart';
+import 'package:ksl/provider/learnedWordProvider.dart';
+import 'package:ksl/provider/progressProvider.dart';
+import 'package:ksl/provider/feedbackProvider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,7 +24,21 @@ void main() async {
     ProgressController.startSession();
   }
   
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()..loadSavedUser()),
+        ChangeNotifierProvider(create: (_) => TopicProvider()),
+        ChangeNotifierProvider(create: (_) => WordProvider()),
+        ChangeNotifierProvider(create: (_) => ExamProvider()),
+        ChangeNotifierProvider(create: (_) => FavoriteWordProvider()),
+        ChangeNotifierProvider(create: (_) => LearnedWordProvider()),
+        ChangeNotifierProvider(create: (_) => ProgressProvider()),
+        ChangeNotifierProvider(create: (_) => FeedbackProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {

@@ -12,8 +12,6 @@ import 'package:ksl/view/account/login.dart';
 import 'package:ksl/component/messDialog.dart';
 
 class AuthController {
-  static final ValueNotifier<UserModel?> userNotifier = ValueNotifier<UserModel?>(null);
-
   /// Đăng nhập với username và password
   static Future<Map<String, dynamic>> login(String username, String password) async {
     try {
@@ -105,9 +103,6 @@ class AuthController {
     await prefs.setString('access_token', user.accessToken);
     await prefs.setString('refresh_token', user.refreshToken);
     await prefs.setBool('is_logged_in', true);
-    
-    // Cập nhật notifier để giao diện thay đổi realtime
-    userNotifier.value = user;
 
     // Bắt đầu phiên làm việc mới
     ProgressController.startSession();
@@ -122,9 +117,7 @@ class AuthController {
     final prefs = await SharedPreferences.getInstance();
     final userData = prefs.getString('user_data');
     if (userData != null) {
-      final user = UserModel.fromJson(jsonDecode(userData));
-      userNotifier.value = user; // Khởi tạo giá trị ban đầu cho notifier
-      return user;
+      return UserModel.fromJson(jsonDecode(userData));
     }
     return null;
   }
@@ -326,7 +319,7 @@ class AuthController {
  
   static void handleSessionExpired(String message) async {
     try {
-      if (userNotifier.value == null && !(await isLoggedIn())) return;
+      if (!(await isLoggedIn())) return;
 
       await logout();
 

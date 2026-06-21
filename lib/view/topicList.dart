@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/topicController.dart';
-import 'package:ksl/controller/progressController.dart';
+import 'package:ksl/provider/topicProvider.dart';
+import 'package:ksl/provider/progressProvider.dart';
 import 'package:ksl/model/topic.dart';
 import 'package:ksl/component/lazyLoading.dart';
 import 'package:ksl/view/wordList.dart';
 import 'package:ksl/component/messDialog.dart';
-import '../model/progress.dart';
+import 'package:ksl/model/progress.dart';
 
 class LessonPage extends StatefulWidget {
   const LessonPage({super.key});
@@ -16,14 +17,6 @@ class LessonPage extends StatefulWidget {
 }
 
 class _LessonPageState extends State<LessonPage> {
-  List<TopicModel> _allTopics = [];
-  ProgressModel? _userProgress;
-  bool _isLoading = true;
-  bool _isFetchingMore = false;
-  bool _hasMore = true;
-  int _currentPage = 1;
-  final int _limit = 10;
-  
   String _searchQuery = "";
   String _selectedLevel = "All";
   final ScrollController _scrollController = ScrollController();
@@ -31,7 +24,10 @@ class _LessonPageState extends State<LessonPage> {
   @override
   void initState() {
     super.initState();
-    _fetchData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<TopicProvider>().fetchTopics();
+      context.read<ProgressProvider>().fetchUserProgress();
+    });
   }
 
   @override
@@ -40,73 +36,14 @@ class _LessonPageState extends State<LessonPage> {
     super.dispose();
   }
 
-  Future<void> _fetchData({bool isLoadMore = false, bool showLoading = true}) async {
-    if (isLoadMore) {
-      if (_isFetchingMore || !_hasMore) return;
-      setState(() => _isFetchingMore = true);
-    } else if (showLoading) {
-      setState(() {
-        _isLoading = true;
-        _currentPage = 1;
-        _allTopics = [];
-        _hasMore = true;
-      });
-    }
-
-    final bool shouldFetchTopics = showLoading || _allTopics.isEmpty || isLoadMore;
-    
-    dynamic topicResult;
-    if (shouldFetchTopics) {
-      topicResult = await TopicController.getAllTopics(page: _currentPage, limit: _limit);
-    }
-    
-    final progressResult = await ProgressController.getUserProgress();
-    
-    if (mounted) {
-      setState(() {
-        if (shouldFetchTopics && topicResult != null) {
-          if (topicResult['success']) {
-            final List<TopicModel> newTopics = topicResult['data'];
-            if (newTopics.length < _limit) {
-              _hasMore = false;
-            } else {
-              _hasMore = true;
-              _currentPage++;
-            }
-            
-            if (showLoading) {
-              _allTopics = newTopics;
-            } else {
-              _allTopics.addAll(newTopics);
-            }
-          } else {
-            _hasMore = false;
-          }
-        }
-
-        if (progressResult['success']) {
-          _userProgress = progressResult['data'];
-        }
-        
-        _isLoading = false;
-        _isFetchingMore = false;
-      });
-    }
-  }
-
-  void _onFilterChanged() {
-    _fetchData();
-  }
-
-  List<TopicModel> get _filteredTopics {
-    List<TopicModel> filtered = _allTopics.where((topic) {
+  List<TopicModel> _filteredTopics(List<TopicModel> allTopics, int userExp) {
+    List<TopicModel> filtered = allTopics.where((topic) {
       final matchesSearch = topic.name.toLowerCase().contains(_searchQuery.toLowerCase());
       final matchesLevel = _selectedLevel == "All" || topic.level == _selectedLevel;
       return matchesSearch && matchesLevel;
     }).toList();
 
     // Sắp xếp: Ưu tiên các topic đã mở (đủ EXP), sau đó sắp xếp theo bảng chữ cái
-    final int userExp = _userProgress?.stats.totalExp ?? 0;
     filtered.sort((a, b) {
       final bool aLocked = userExp < a.expRequired;
       final bool bLocked = userExp < b.expRequired;
@@ -125,6 +62,10 @@ class _LessonPageState extends State<LessonPage> {
 
   @override
   Widget build(BuildContext context) {
+    final topicProvider = context.watch<TopicProvider>();
+    final progressProvider = context.watch<ProgressProvider>();
+    final userExp = progressProvider.userProgress?.stats.totalExp ?? 0;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
@@ -146,16 +87,16 @@ class _LessonPageState extends State<LessonPage> {
           _buildHeader(),
           _buildLevelFilter(),
           Expanded(
-            child: _isLoading
+            child: topicProvider.isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
-                : _allTopics.isEmpty
+                : topicProvider.topics.isEmpty
                     ? _buildEmptyState()
                     : LazyLoadingList(
-                        isLoading: _isFetchingMore,
-                        hasMore: _hasMore,
-                        onLoadMore: () => _fetchData(isLoadMore: true),
+                        isLoading: topicProvider.isFetchingMore,
+                        hasMore: topicProvider.hasMore,
+                        onLoadMore: () => context.read<TopicProvider>().fetchTopics(isLoadMore: true),
                         controller: _scrollController,
-                        child: _buildTopicList(),
+                        child: _buildTopicList(topicProvider, userExp),
                       ),
           ),
         ],
@@ -221,10 +162,7 @@ class _LessonPageState extends State<LessonPage> {
           final isSelected = _selectedLevel == level;
           return GestureDetector(
             onTap: () {
-              setState(() {
-                _selectedLevel = level;
-                _onFilterChanged();
-              });
+              setState(() => _selectedLevel = level);
             },
             child: Container(
               margin: const EdgeInsets.only(right: 12),
@@ -258,16 +196,16 @@ class _LessonPageState extends State<LessonPage> {
     );
   }
 
-  Widget _buildTopicList() {
-    final topics = _filteredTopics;
+  Widget _buildTopicList(TopicProvider topicProvider, int userExp) {
+    final topics = _filteredTopics(topicProvider.topics, userExp);
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(20),
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-      itemCount: topics.length + (_isFetchingMore ? 1 : 0),
+      itemCount: topics.length + (topicProvider.isFetchingMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index < topics.length) {
-          return _buildTopicCard(topics[index]);
+          return _buildTopicCard(topics[index], userExp);
         } else {
           return const LoadingIndicator();
         }
@@ -275,10 +213,10 @@ class _LessonPageState extends State<LessonPage> {
     );
   }
 
-  Widget _buildTopicCard(TopicModel topic) {
+  Widget _buildTopicCard(TopicModel topic, int userExp) {
     final topicId = topic.id;
-    final progressList = _userProgress?.topicProgress ?? [];
-    
+    final progressList = context.watch<ProgressProvider>().userProgress?.topicProgress ?? [];
+
     // Tìm topicProgress tương ứng
     TopicProgressModel? topicProgress;
     try {
@@ -288,11 +226,10 @@ class _LessonPageState extends State<LessonPage> {
     } catch (_) {
       topicProgress = null;
     }
-    
+
     final double percentage = topicProgress?.percentage ?? 0.0;
-    
+
     // Kiểm tra topic có bị khóa hay không
-    final int userExp = _userProgress?.stats.totalExp ?? 0;
     final bool isLocked = userExp < topic.expRequired;
 
     return Container(
@@ -328,7 +265,9 @@ class _LessonPageState extends State<LessonPage> {
                       builder: (context) => WordListScreen(topic: topic),
                     ),
                   );
-                  _fetchData(showLoading: false);
+                  if (context.mounted) {
+                    context.read<ProgressProvider>().fetchUserProgress();
+                  }
                 },
             child: Padding(
               padding: const EdgeInsets.all(16),

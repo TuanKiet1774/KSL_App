@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/authController.dart';
+import 'package:ksl/provider/authProvider.dart';
 import 'package:ksl/view/home.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/view/account/register.dart';
@@ -63,7 +64,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       _isLoading = true;
     });
 
-    final result = await AuthController.login(
+    final result = await context.read<AuthProvider>().login(
       _usernameController.text.trim(),
       _passwordController.text,
     );

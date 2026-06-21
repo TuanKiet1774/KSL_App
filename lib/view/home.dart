@@ -13,7 +13,8 @@ import 'package:ksl/view/examList.dart';
 import 'package:ksl/component/confirmDialog.dart';
 import 'package:ksl/component/avatar.dart';
 import 'package:ksl/model/user.dart';
-import 'package:ksl/controller/authController.dart';
+import 'package:provider/provider.dart';
+import 'package:ksl/provider/authProvider.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -53,9 +54,9 @@ class _HomePageState extends State<HomePage> {
           currentIndex: _selectedIndex,
           onTap: (index) => setState(() => _selectedIndex = index),
         ),
-        body: ValueListenableBuilder<UserModel?>(
-          valueListenable: AuthController.userNotifier,
-          builder: (context, user, _) {
+        body: Consumer<AuthProvider>(
+          builder: (context, authProvider, _) {
+            final user = authProvider.currentUser;
             return IndexedStack(
               index: _selectedIndex,
               children: [

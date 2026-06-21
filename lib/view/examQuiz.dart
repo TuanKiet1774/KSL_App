@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/examController.dart';
-import 'package:ksl/controller/authController.dart';
+import 'package:ksl/provider/examProvider.dart';
+import 'package:ksl/provider/authProvider.dart';
 import 'package:ksl/model/exam.dart';
 import 'package:ksl/model/question.dart';
-import 'package:ksl/model/user.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/component/confirmDialog.dart';
 import 'package:ksl/component/youtubeFrame.dart';
@@ -89,7 +89,7 @@ class _ExamQuizPageState extends State<ExamQuizPage> {
     _timer?.cancel();
     setState(() => _isSubmitting = true);
 
-    final UserModel? user = await AuthController.getSavedUser();
+    final user = context.read<AuthProvider>().currentUser;
     if (user == null) return;
 
     int totalScore = 0;
@@ -133,7 +133,7 @@ class _ExamQuizPageState extends State<ExamQuizPage> {
       });
     }
 
-    final submitResult = await ExamController.submitExamResult(
+    final submitResult = await context.read<ExamProvider>().submitExamResult(
       userId: user.id,
       examId: widget.exam.id,
       results: results,

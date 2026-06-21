@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/examController.dart';
-import 'package:ksl/controller/authController.dart';
+import 'package:ksl/provider/examProvider.dart';
+import 'package:ksl/provider/authProvider.dart';
 import 'package:ksl/model/examResult.dart';
 import 'package:intl/intl.dart';
 
-import 'package:ksl/model/exam.dart';
 import 'package:ksl/view/examResult.dart';
 import 'package:ksl/component/messDialog.dart';
 
@@ -19,33 +19,16 @@ class ExamHistoryPage extends StatefulWidget {
 }
 
 class _ExamHistoryPageState extends State<ExamHistoryPage> {
-  List<ExamResultModel> _history = [];
-  bool _isLoading = true;
-  String _errorMessage = "";
-
   @override
   void initState() {
     super.initState();
-    _fetchHistory();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchHistory());
   }
 
   Future<void> _fetchHistory() async {
-    final user = await AuthController.getSavedUser();
+    final user = context.read<AuthProvider>().currentUser;
     if (user == null) return;
-
-    final result = await ExamController.getUserResults(user.id);
-    
-    if (mounted) {
-      setState(() {
-        if (result['success']) {
-          _history = result['data'];
-          _history.sort((a, b) => (b.createdAt ?? DateTime.now()).compareTo(a.createdAt ?? DateTime.now()));
-        } else {
-          _errorMessage = result['message'];
-        }
-        _isLoading = false;
-      });
-    }
+    await context.read<ExamProvider>().fetchUserResults(user.id);
   }
 
   String _formatDate(DateTime? date) {
@@ -61,6 +44,9 @@ class _ExamHistoryPageState extends State<ExamHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final examProvider = context.watch<ExamProvider>();
+    final history = examProvider.results;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
@@ -76,7 +62,7 @@ class _ExamHistoryPageState extends State<ExamHistoryPage> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          if (_history.isNotEmpty)
+          if (history.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep_rounded, color: Colors.white),
               onPressed: _showClearHistoryConfirmation,
@@ -87,20 +73,20 @@ class _ExamHistoryPageState extends State<ExamHistoryPage> {
         children: [
           _buildHeader(),
           Expanded(
-            child: _isLoading
+            child: examProvider.isLoadingResults
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
-                : _errorMessage.isNotEmpty
-                    ? _buildErrorState()
-                    : _history.isEmpty
+                : (examProvider.resultsErrorMessage ?? '').isNotEmpty
+                    ? _buildErrorState(examProvider.resultsErrorMessage ?? '')
+                    : history.isEmpty
                         ? _buildEmptyState()
                         : RefreshIndicator(
                             onRefresh: _fetchHistory,
                             color: AppColors.primaryTeal,
                             child: ListView.builder(
                               padding: const EdgeInsets.all(20),
-                              itemCount: _history.length,
+                              itemCount: history.length,
                               itemBuilder: (context, index) {
-                                return _buildDismissibleCard(_history[index], index);
+                                return _buildDismissibleCard(history[index]);
                               },
                             ),
                           ),
@@ -110,7 +96,7 @@ class _ExamHistoryPageState extends State<ExamHistoryPage> {
     );
   }
 
-  Widget _buildDismissibleCard(ExamResultModel result, int index) {
+  Widget _buildDismissibleCard(ExamResultModel result) {
     return Dismissible(
       key: Key(result.id),
       direction: DismissDirection.endToStart,
@@ -128,7 +114,7 @@ class _ExamHistoryPageState extends State<ExamHistoryPage> {
         return await _showDeleteConfirmation(result);
       },
       onDismissed: (direction) {
-        _deleteSingleResult(result.id, index);
+        _deleteSingleResult(result.id);
       },
       child: _buildHistoryCard(result),
     );
@@ -164,13 +150,10 @@ class _ExamHistoryPageState extends State<ExamHistoryPage> {
     );
   }
 
-  Future<void> _deleteSingleResult(String id, int index) async {
-    final result = await ExamController.deleteResult(id);
+  Future<void> _deleteSingleResult(String id) async {
+    final result = await context.read<ExamProvider>().deleteResult(id);
     if (mounted) {
       if (result['success']) {
-        setState(() {
-          _history.removeAt(index);
-        });
         MessDialog.showSuccessDialog(context, 'Thành công', 'Đã xóa kết quả bài thi');
       } else {
         MessDialog.showErrorDialog(context, 'Lỗi', result['message']);
@@ -180,21 +163,15 @@ class _ExamHistoryPageState extends State<ExamHistoryPage> {
   }
 
   Future<void> _clearAllHistory() async {
-    final user = await AuthController.getSavedUser();
+    final user = context.read<AuthProvider>().currentUser;
     if (user == null) return;
 
-    setState(() => _isLoading = true);
-    final result = await ExamController.clearHistory(user.id);
-    
+    final result = await context.read<ExamProvider>().clearHistory(user.id);
+
     if (mounted) {
       if (result['success']) {
-        setState(() {
-          _history.clear();
-          _isLoading = false;
-        });
         MessDialog.showSuccessDialog(context, 'Thành công', 'Đã xóa toàn bộ lịch sử');
       } else {
-        setState(() => _isLoading = false);
         MessDialog.showErrorDialog(context, 'Lỗi', result['message']);
       }
     }
@@ -271,14 +248,15 @@ class _ExamHistoryPageState extends State<ExamHistoryPage> {
                 builder: (context) => const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal)),
               );
 
-              final examResult = await ExamController.getExamById(result.examId);
-              
+              final examProvider = context.read<ExamProvider>();
+              await examProvider.fetchExamById(result.examId);
+              final exam = examProvider.currentExam;
+
               if (mounted) {
                 Navigator.pop(context);
 
-                if (examResult['success']) {
-                  final exam = examResult['data'] as ExamModel;
-                  
+                if (exam != null) {
+
                   // Chuyển đổi format kết quả
                   final List<Map<String, dynamic>> formattedResults = result.results.map((r) => {
                     'questionId': r.questionId,
@@ -301,7 +279,7 @@ class _ExamHistoryPageState extends State<ExamHistoryPage> {
                     ),
                   );
                 } else {
-                  MessDialog.showErrorDialog(context, 'Lỗi', 'Không thể tải thông tin bài thi: ${examResult['message']}');
+                  MessDialog.showErrorDialog(context, 'Lỗi', 'Không thể tải thông tin bài thi');
                 }
               }
             },
@@ -379,14 +357,14 @@ class _ExamHistoryPageState extends State<ExamHistoryPage> {
     );
   }
 
-  Widget _buildErrorState() {
+  Widget _buildErrorState(String errorMessage) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.error_outline_rounded, size: 60, color: Colors.redAccent),
           const SizedBox(height: 16),
-          Text(_errorMessage, style: const TextStyle(color: Colors.grey)),
+          Text(errorMessage, style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _fetchHistory,

@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/learnedWordController.dart';
+import 'package:ksl/provider/learnedWordProvider.dart';
+import 'package:ksl/provider/authProvider.dart';
 import 'package:ksl/component/confirmDialog.dart';
 import 'package:ksl/component/messDialog.dart';
 import 'package:ksl/model/learnedWord.dart';
 import 'package:ksl/view/learnedWordDetail.dart';
-import 'package:ksl/controller/authController.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LearnedWordListScreen extends StatefulWidget {
@@ -17,28 +18,22 @@ class LearnedWordListScreen extends StatefulWidget {
 }
 
 class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
-  List<LearnedWordModel> _learnedWords = [];
-  bool _isLoading = true;
-  String _errorMessage = "";
   bool _isSelectionMode = false;
   final Set<String> _selectedWordIds = {};
-  
+
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
 
-  // Phân trang
   final ScrollController _scrollController = ScrollController();
-  int _currentPage = 1;
-  bool _hasMore = true;
-  bool _isFetchingMore = false;
-  final int _limit = 20;
 
   @override
   void initState() {
     super.initState();
-    _fetchLearnedWords();
-    _syncUserExp();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<LearnedWordProvider>().fetchLearnedWords();
+      _syncUserExp();
+    });
     _scrollController.addListener(_onScroll);
   }
 
@@ -51,76 +46,23 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
 
   void _onScroll() {
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      if (_hasMore && !_isFetchingMore && !_isLoading && _searchQuery.isEmpty) {
-        _fetchMoreLearnedWords();
+      final provider = context.read<LearnedWordProvider>();
+      if (provider.hasMore && !provider.isFetchingMore && !provider.isLoading && _searchQuery.isEmpty) {
+        provider.fetchLearnedWords(isLoadMore: true);
       }
     }
   }
 
   Future<void> _syncUserExp() async {
-    final result = await LearnedWordController.syncExp();
-    if (mounted && result['success']) {
-      await AuthController.getProfile();
+    final result = await context.read<LearnedWordProvider>().syncExp();
+    if (mounted && result['success'] == true) {
+      await context.read<AuthProvider>().getProfile();
     }
   }
 
-  Future<void> _fetchLearnedWords() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = "";
-      _currentPage = 1;
-      _hasMore = true;
-    });
-
-    final result = await LearnedWordController.getMyLearnedWords(page: _currentPage, limit: _limit);
-
-    if (mounted) {
-      setState(() {
-        if (result['success']) {
-          _learnedWords = result['data'];
-          if (_learnedWords.length < _limit) {
-            _hasMore = false;
-          }
-        } else {
-          _errorMessage = result['message'];
-        }
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _fetchMoreLearnedWords() async {
-    if (_isFetchingMore) return;
-
-    setState(() {
-      _isFetchingMore = true;
-    });
-
-    final nextPage = _currentPage + 1;
-    final result = await LearnedWordController.getMyLearnedWords(page: nextPage, limit: _limit);
-
-    if (mounted) {
-      setState(() {
-        if (result['success']) {
-          final List<LearnedWordModel> newWords = result['data'];
-          if (newWords.isEmpty) {
-            _hasMore = false;
-          } else {
-            _learnedWords.addAll(newWords);
-            _currentPage = nextPage;
-            if (newWords.length < _limit) {
-              _hasMore = false;
-            }
-          }
-        }
-        _isFetchingMore = false;
-      });
-    }
-  }
-
-  List<LearnedWordModel> get _filteredWords {
-    if (_searchQuery.isEmpty) return _learnedWords;
-    return _learnedWords.where((w) {
+  List<LearnedWordModel> _filteredWords(List<LearnedWordModel> learnedWords) {
+    if (_searchQuery.isEmpty) return learnedWords;
+    return learnedWords.where((w) {
       final name = w.wordId?.name.toLowerCase() ?? "";
       final topic = w.topicId?.name.toLowerCase() ?? "";
       return name.contains(_searchQuery.toLowerCase()) || topic.contains(_searchQuery.toLowerCase());
@@ -129,6 +71,10 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final learnedProvider = context.watch<LearnedWordProvider>();
+    final learnedWords = learnedProvider.learnedWords;
+    final filteredWords = _filteredWords(learnedWords);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
@@ -171,12 +117,12 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
           },
         ),
         actions: [
-          if (!_isSearching && !_isSelectionMode && _learnedWords.isNotEmpty)
+          if (!_isSearching && !_isSelectionMode && learnedWords.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.search_rounded, color: Colors.white),
               onPressed: () => setState(() => _isSearching = true),
             ),
-          if (_learnedWords.isNotEmpty && !_isSearching)
+          if (learnedWords.isNotEmpty && !_isSearching)
             IconButton(
               icon: Icon(_isSelectionMode ? Icons.select_all_rounded : Icons.edit_note_rounded, color: Colors.white),
               onPressed: () {
@@ -184,10 +130,10 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
                   if (!_isSelectionMode) {
                     _isSelectionMode = true;
                   } else {
-                    if (_selectedWordIds.length == _learnedWords.length) {
+                    if (_selectedWordIds.length == learnedWords.length) {
                       _selectedWordIds.clear();
                     } else {
-                      _selectedWordIds.addAll(_learnedWords.map((w) => w.id));
+                      _selectedWordIds.addAll(learnedWords.map((w) => w.id));
                     }
                   }
                 });
@@ -201,13 +147,13 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
             children: [
               if (!_isSearching) _buildHeader(),
               Expanded(
-                child: _isLoading
+                child: learnedProvider.isLoading
                     ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
-                    : _errorMessage.isNotEmpty
-                        ? _buildErrorState()
-                        : _filteredWords.isEmpty
+                    : (learnedProvider.errorMessage ?? '').isNotEmpty
+                        ? _buildErrorState(learnedProvider.errorMessage ?? '')
+                        : filteredWords.isEmpty
                             ? _buildEmptyState()
-                            : _buildLearnedWordList(),
+                            : _buildLearnedWordList(filteredWords, learnedProvider),
               ),
             ],
           ),
@@ -302,12 +248,11 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
     );
   }
 
-  Widget _buildLearnedWordList() {
-    final list = _filteredWords;
+  Widget _buildLearnedWordList(List<LearnedWordModel> list, LearnedWordProvider provider) {
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-      itemCount: list.length + (_hasMore && _searchQuery.isEmpty ? 1 : 0),
+      itemCount: list.length + (provider.hasMore && _searchQuery.isEmpty ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == list.length) {
           return const Padding(
@@ -316,12 +261,12 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
           );
         }
         final learned = list[index];
-        return _buildDismissibleCard(learned, index);
+        return _buildDismissibleCard(learned, list);
       },
     );
   }
 
-  Widget _buildDismissibleCard(LearnedWordModel learned, int index) {
+  Widget _buildDismissibleCard(LearnedWordModel learned, List<LearnedWordModel> list) {
     return Dismissible(
       key: Key(learned.id),
       direction: _isSelectionMode ? DismissDirection.none : DismissDirection.endToStart,
@@ -339,14 +284,15 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
         return await _showDeleteConfirmation(learned);
       },
       onDismissed: (direction) {
-        _deleteSingleWord(learned.id, index);
+        _deleteSingleWord(learned.id);
       },
-      child: _buildLearnedWordCard(learned, index),
+      child: _buildLearnedWordCard(learned, list),
     );
   }
 
-  Widget _buildLearnedWordCard(LearnedWordModel learned, int index) {
+  Widget _buildLearnedWordCard(LearnedWordModel learned, List<LearnedWordModel> list) {
     bool isSelected = _selectedWordIds.contains(learned.id);
+    final index = list.indexWhere((w) => w.id == learned.id);
 
     return GestureDetector(
       onLongPress: () {
@@ -374,7 +320,7 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
             context,
             MaterialPageRoute(
               builder: (context) => LearnedWordDetailScreen(
-                learnedWords: _filteredWords,
+                learnedWords: list,
                 initialIndex: index,
               ),
             ),
@@ -485,9 +431,10 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
     );
   }
 
-  Future<void> _deleteSingleWord(String id, int index) async {
-    final learned = _learnedWords[index];
-    final result = await LearnedWordController.deleteLearnedWord(id);
+  Future<void> _deleteSingleWord(String id) async {
+    final provider = context.read<LearnedWordProvider>();
+    final learned = provider.learnedWords.firstWhere((w) => w.id == id);
+    final result = await provider.deleteLearnedWord(id);
     if (mounted) {
       if (result['success']) {
         // Xóa luôn vết (reset index về 0) cho topic của từ này
@@ -495,62 +442,58 @@ class _LearnedWordListScreenState extends State<LearnedWordListScreen> {
           final prefs = await SharedPreferences.getInstance();
           await prefs.remove('last_index_${learned.topicId!.id}');
         }
-        
-        setState(() {
-          _learnedWords.removeAt(index);
-        });
+
         _syncUserExp();
         MessDialog.showSuccessDialog(context, 'Thành công', result['message']);
       } else {
         MessDialog.showErrorDialog(context, 'Lỗi', result['message']);
-        _fetchLearnedWords();
+        context.read<LearnedWordProvider>().fetchLearnedWords();
       }
     }
   }
 
   Future<void> _deleteMultipleWords() async {
-    setState(() => _isLoading = true);
-    
-    final result = await LearnedWordController.deleteMultipleLearnedWords(_selectedWordIds.toList());
-    
+    final provider = context.read<LearnedWordProvider>();
+    final deletedTopics = provider.learnedWords
+        .where((w) => _selectedWordIds.contains(w.id))
+        .map((w) => w.topicId?.id)
+        .whereType<String>()
+        .toSet();
+
+    final result = await provider.deleteMultipleLearnedWords(_selectedWordIds.toList());
+
     if (mounted) {
       if (result['success']) {
         final prefs = await SharedPreferences.getInstance();
-        final deletedTopics = _learnedWords
-            .where((w) => _selectedWordIds.contains(w.id))
-            .map((w) => w.topicId?.id)
-            .whereType<String>()
-            .toSet();
-        
         for (var topicId in deletedTopics) {
           await prefs.remove('last_index_$topicId');
         }
 
         setState(() {
-          _learnedWords.removeWhere((w) => _selectedWordIds.contains(w.id));
           _selectedWordIds.clear();
           _isSelectionMode = false;
-          _isLoading = false;
         });
         _syncUserExp();
         MessDialog.showSuccessDialog(context, 'Thành công', result['message']);
       } else {
-        setState(() => _isLoading = false);
         MessDialog.showErrorDialog(context, 'Lỗi', result['message']);
       }
     }
   }
 
-  Widget _buildErrorState() {
+  Widget _buildErrorState(String errorMessage) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const Icon(Icons.error_outline_rounded, size: 80, color: Colors.redAccent),
           const SizedBox(height: 16),
-          Text(_errorMessage, style: const TextStyle(color: Colors.grey)),
+          Text(errorMessage, style: const TextStyle(color: Colors.grey)),
           const SizedBox(height: 20),
-          ElevatedButton(onPressed: _fetchLearnedWords, child: const Text('Thử lại')),
+          ElevatedButton(
+            onPressed: () => context.read<LearnedWordProvider>().fetchLearnedWords(),
+            child: const Text('Thử lại'),
+          ),
         ],
       ),
     );

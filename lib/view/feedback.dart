@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ksl/component/appColors.dart';
 import 'package:ksl/component/messDialog.dart';
-import 'package:ksl/controller/authController.dart';
-import 'package:ksl/controller/feedbackController.dart';
+import 'package:ksl/provider/authProvider.dart';
+import 'package:ksl/provider/feedbackProvider.dart';
 import 'package:intl/intl.dart';
-import 'package:ksl/model/feedback.dart';
 
 class FeedbackPage extends StatefulWidget {
   const FeedbackPage({super.key});
@@ -16,7 +16,6 @@ class FeedbackPage extends StatefulWidget {
 class _FeedbackPageState extends State<FeedbackPage> {
   int _rating = 0;
   final TextEditingController _commentController = TextEditingController();
-  bool _isLoading = false;
 
   Future<void> _submitFeedback() async {
     if (_rating == 0) {
@@ -37,52 +36,47 @@ class _FeedbackPageState extends State<FeedbackPage> {
       return;
     }
 
-    setState(() => _isLoading = true);
-
-    try {
-      final user = await AuthController.getSavedUser();
-      if (user == null) {
-        if (mounted) {
-          MessDialog.showErrorDialog(
-            context,
-            'Lỗi',
-            'Bạn cần đăng nhập để thực hiện chức năng này',
-          );
-        }
-        return;
-      }
-
-      final result = await FeedbackController.sendFeedback(
-        rating: _rating,
-        comment: _commentController.text.trim(),
-      );
-
+    final user = context.read<AuthProvider>().currentUser;
+    if (user == null) {
       if (mounted) {
-        if (result['success']) {
-          MessDialog.showSuccessDialog(
-            context,
-            'Thành công',
-            'Cảm ơn ý kiến đóng góp của bạn!',
-          );
-          _commentController.clear();
-          setState(() {
-            _rating = 0;
-          });
-        } else {
-          MessDialog.showErrorDialog(
-            context,
-            'Lỗi',
-            result['message'] ?? 'Gửi phản hồi thất bại',
-          );
-        }
+        MessDialog.showErrorDialog(
+          context,
+          'Lỗi',
+          'Bạn cần đăng nhập để thực hiện chức năng này',
+        );
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
+    final result = await context.read<FeedbackProvider>().sendFeedback(
+      rating: _rating,
+      comment: _commentController.text.trim(),
+    );
+
+    if (mounted) {
+      if (result['success']) {
+        MessDialog.showSuccessDialog(
+          context,
+          'Thành công',
+          'Cảm ơn ý kiến đóng góp của bạn!',
+        );
+        _commentController.clear();
+        setState(() {
+          _rating = 0;
+        });
+      } else {
+        MessDialog.showErrorDialog(
+          context,
+          'Lỗi',
+          result['message'] ?? 'Gửi phản hồi thất bại',
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isSubmitting = context.watch<FeedbackProvider>().isSubmitting;
     return Scaffold(
       backgroundColor: AppColors.backgroundCream,
       appBar: AppBar(
@@ -123,7 +117,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                   const SizedBox(height: 20),
                   _buildCommentCard(),
                   const SizedBox(height: 32),
-                  _buildSubmitButton(),
+                  _buildSubmitButton(isSubmitting),
                 ],
               ),
             ),
@@ -271,9 +265,9 @@ class _FeedbackPageState extends State<FeedbackPage> {
     );
   }
 
-  Widget _buildSubmitButton() {
+  Widget _buildSubmitButton(bool isSubmitting) {
     return ElevatedButton(
-      onPressed: _isLoading ? null : _submitFeedback,
+      onPressed: isSubmitting ? null : _submitFeedback,
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primaryTeal,
         foregroundColor: Colors.white,
@@ -284,7 +278,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
         elevation: 4,
         shadowColor: AppColors.primaryTeal.withOpacity(0.4),
       ),
-      child: _isLoading
+      child: isSubmitting
           ? const SizedBox(
               height: 24,
               width: 24,
@@ -305,6 +299,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
   }
 
   void _showHistoryModal() {
+    context.read<FeedbackProvider>().fetchHistory();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -340,18 +335,15 @@ class _FeedbackPageState extends State<FeedbackPage> {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: FutureBuilder<Map<String, dynamic>>(
-                future: FeedbackController.getFeedbackHistory(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+              child: Consumer<FeedbackProvider>(
+                builder: (context, feedbackProvider, _) {
+                  if (feedbackProvider.isLoading) {
                     return const Center(
                       child: CircularProgressIndicator(color: AppColors.primaryTeal),
                     );
                   }
 
-                  if (snapshot.hasError ||
-                      snapshot.data == null ||
-                      snapshot.data!['success'] == false) {
+                  if (feedbackProvider.errorMessage != null) {
                     return Center(
                       child: Text(
                         'Không thể tải lịch sử đánh giá',
@@ -360,7 +352,7 @@ class _FeedbackPageState extends State<FeedbackPage> {
                     );
                   }
 
-                  final List<FeedbackModel> history = snapshot.data!['data'] ?? [];
+                  final history = feedbackProvider.history;
 
                   if (history.isEmpty) {
                     return const Center(

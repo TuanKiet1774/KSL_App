@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/progressController.dart';
+import 'package:ksl/provider/progressProvider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 
@@ -15,35 +16,22 @@ class StatisticsView extends StatefulWidget {
 
 class _StatisticsViewState extends State<StatisticsView> {
   ProgressModel? _progressData;
-  bool _isLoading = true;
-  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _fetchData();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetchData());
   }
 
   Future<void> _fetchData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-    final result = await ProgressController.getUserProgress();
-    if (mounted) {
-      setState(() {
-        if (result['success']) {
-          _progressData = result['data'];
-        } else {
-          _errorMessage = result['message'];
-        }
-        _isLoading = false;
-      });
-    }
+    await context.read<ProgressProvider>().fetchUserProgress();
   }
 
   @override
   Widget build(BuildContext context) {
+    final progressProvider = context.watch<ProgressProvider>();
+    _progressData = progressProvider.userProgress;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
@@ -67,10 +55,10 @@ class _StatisticsViewState extends State<StatisticsView> {
         children: [
           _buildHeader(),
           Expanded(
-            child: _isLoading
+            child: progressProvider.isLoading
                 ? _buildLoadingState()
-                : _errorMessage != null
-                    ? _buildErrorState()
+                : progressProvider.errorMessage != null
+                    ? _buildErrorState(progressProvider.errorMessage)
                     : RefreshIndicator(
                         onRefresh: _fetchData,
                         color: AppColors.primaryTeal,
@@ -126,7 +114,7 @@ class _StatisticsViewState extends State<StatisticsView> {
     );
   }
 
-  Widget _buildErrorState() {
+  Widget _buildErrorState(String? errorMessage) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -135,7 +123,7 @@ class _StatisticsViewState extends State<StatisticsView> {
           children: [
             const SizedBox(height: 16),
             Text(
-              _errorMessage ?? 'Đã có lỗi xảy ra',
+              errorMessage ?? 'Đã có lỗi xảy ra',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16, color: Colors.grey),
             ),

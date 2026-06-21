@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/examController.dart';
-import 'package:ksl/controller/progressController.dart';
+import 'package:ksl/provider/examProvider.dart';
+import 'package:ksl/provider/progressProvider.dart';
 import 'package:ksl/model/exam.dart';
 import 'package:ksl/model/progress.dart';
 import 'package:ksl/view/examQuiz.dart';
@@ -15,32 +16,19 @@ class ExamListPage extends StatefulWidget {
 }
 
 class _ExamListPageState extends State<ExamListPage> {
-  List<ExamModel> _exams = [];
-  bool _isLoading = true;
   String _searchQuery = "";
 
   @override
   void initState() {
     super.initState();
-    _fetchExams();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ExamProvider>().fetchExams();
+    });
   }
 
-  Future<void> _fetchExams() async {
-    setState(() => _isLoading = true);
-    final result = await ExamController.getAllExams();
-    if (mounted) {
-      setState(() {
-        if (result['success']) {
-          _exams = result['data'];
-        }
-        _isLoading = false;
-      });
-    }
-  }
-
-  List<ExamModel> get _filteredExams {
-    if (_searchQuery.isEmpty) return _exams;
-    return _exams.where((exam) => 
+  List<ExamModel> _filteredExams(List<ExamModel> exams) {
+    if (_searchQuery.isEmpty) return exams;
+    return exams.where((exam) =>
       exam.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
       exam.description.toLowerCase().contains(_searchQuery.toLowerCase())
     ).toList();
@@ -48,6 +36,9 @@ class _ExamListPageState extends State<ExamListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final examProvider = context.watch<ExamProvider>();
+    final filteredExams = _filteredExams(examProvider.exams);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAF9),
       appBar: AppBar(
@@ -67,14 +58,14 @@ class _ExamListPageState extends State<ExamListPage> {
         children: [
           _buildHeader(),
           Expanded(
-            child: _isLoading
+            child: examProvider.isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal))
-                : _filteredExams.isEmpty
+                : filteredExams.isEmpty
                     ? _buildEmptyState()
                     : RefreshIndicator(
-                        onRefresh: _fetchExams,
+                        onRefresh: () => context.read<ExamProvider>().fetchExams(),
                         color: AppColors.primaryTeal,
-                        child: _buildExamList(),
+                        child: _buildExamList(filteredExams),
                       ),
           ),
         ],
@@ -121,8 +112,7 @@ class _ExamListPageState extends State<ExamListPage> {
     );
   }
 
-  Widget _buildExamList() {
-    final exams = _filteredExams;
+  Widget _buildExamList(List<ExamModel> exams) {
     return ListView.builder(
       padding: const EdgeInsets.all(20),
       physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
@@ -159,24 +149,27 @@ class _ExamListPageState extends State<ExamListPage> {
                 builder: (context) => const Center(child: CircularProgressIndicator(color: AppColors.primaryTeal)),
               );
 
-              final result = await ExamController.getExamById(exam.id);
-              
+              final examProvider = context.read<ExamProvider>();
+              final progressProvider = context.read<ProgressProvider>();
+
+              await examProvider.fetchExamById(exam.id);
+              final fullExam = examProvider.currentExam;
+
               if (mounted) {
-                if (result['success']) {
-                  final fullExam = result['data'] as ExamModel;
+                if (fullExam != null) {
                   if (fullExam.questions.isEmpty) {
                     Navigator.pop(context); // Đóng loading
                     MessDialog.showInfoDialog(context, 'Thông báo', 'Bài thi này hiện chưa có câu hỏi nào.');
                     return;
                   }
 
-                  final progressResult = await ProgressController.getUserProgress();
-                  
-                  if (mounted) {
-                    Navigator.pop(context); 
+                  await progressProvider.fetchUserProgress();
+                  final progress = progressProvider.userProgress;
 
-                    if (progressResult['success']) {
-                      final progress = progressResult['data'] as ProgressModel;
+                  if (mounted) {
+                    Navigator.pop(context);
+
+                    if (progress != null) {
                       
                       final examTopicIds = fullExam.questions
                           .map((q) => q.topicId)
@@ -235,7 +228,7 @@ class _ExamListPageState extends State<ExamListPage> {
                   }
                 } else {
                   Navigator.pop(context); // Đóng loading
-                  MessDialog.showErrorDialog(context, 'Lỗi', result['message']);
+                  MessDialog.showErrorDialog(context, 'Lỗi', 'Không thể lấy chi tiết bài thi');
                 }
               }
             },

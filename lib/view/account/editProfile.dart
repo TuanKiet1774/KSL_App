@@ -2,11 +2,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:ksl/component/appColors.dart';
 import 'package:ksl/component/avatar.dart';
 import 'package:ksl/connectDB/imgBB.dart';
 import 'package:ksl/component/messDialog.dart';
-import 'package:ksl/controller/authController.dart';
+import 'package:ksl/provider/authProvider.dart';
 import 'package:ksl/model/user.dart';
 
 class EditProfilePage extends StatefulWidget {
@@ -163,7 +164,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       _isLoading = true;
     });
 
-    final result = await AuthController.updateProfile(
+    final result = await context.read<AuthProvider>().updateProfile(
       fullname: _fullnameController.text.trim(),
       phone: _phoneController.text.trim(),
       gender: _selectedGender,

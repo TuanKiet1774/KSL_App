@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:ksl/component/appColors.dart';
-import 'package:ksl/controller/authController.dart';
+import 'package:ksl/provider/authProvider.dart';
 import 'package:ksl/model/user.dart';
 import 'package:ksl/view/account/login.dart';
 import 'package:ksl/component/confirmDialog.dart';
@@ -20,19 +21,8 @@ class SettingsView extends StatefulWidget {
 }
 
 class _SettingsViewState extends State<SettingsView> {
-  UserModel? _user;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUserData();
-  }
-
   Future<void> _loadUserData() async {
-    final user = await AuthController.getSavedUser();
-    setState(() {
-      _user = user;
-    });
+    await context.read<AuthProvider>().getProfile();
   }
 
   Future<void> _handleLogout() async {
@@ -46,7 +36,7 @@ class _SettingsViewState extends State<SettingsView> {
       confirmText: 'Đăng xuất',
       cancelText: 'Hủy',
       onConfirm: () async {
-        await AuthController.logout();
+        await context.read<AuthProvider>().logout();
         if (mounted) {
           Navigator.pushAndRemoveUntil(
             context,
@@ -60,6 +50,7 @@ class _SettingsViewState extends State<SettingsView> {
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthProvider>().currentUser;
     return Scaffold(
       backgroundColor: AppColors.backgroundCream,
       body: SafeArea(
@@ -68,7 +59,7 @@ class _SettingsViewState extends State<SettingsView> {
           child: Column(
             children: [
               const SizedBox(height: 20),
-              _buildProfileHeader(),
+              _buildProfileHeader(user),
               const SizedBox(height: 32),
               _buildMenuSection(),
               const SizedBox(height: 40),
@@ -79,7 +70,7 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  Widget _buildProfileHeader() {
+  Widget _buildProfileHeader(UserModel? user) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24),
       padding: const EdgeInsets.all(24),
@@ -116,8 +107,8 @@ class _SettingsViewState extends State<SettingsView> {
               radius: 42,
               backgroundColor: Colors.white.withOpacity(0.9),
               child: UserAvatar(
-                imageUrl: _user?.avatar,
-                fullname: _user?.fullname ?? "K",
+                imageUrl: user?.avatar,
+                fullname: user?.fullname ?? "K",
                 radius: 38,
                 fontSize: 24,
               ),
@@ -129,7 +120,7 @@ class _SettingsViewState extends State<SettingsView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _user?.fullname ?? '',
+                  user?.fullname ?? '',
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
@@ -142,7 +133,7 @@ class _SettingsViewState extends State<SettingsView> {
                 const SizedBox(height: 4),
                 // Username
                 Text(
-                  '@${_user?.username ?? ''}',
+                  '@${user?.username ?? ''}',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.white.withOpacity(0.75),
@@ -164,7 +155,7 @@ class _SettingsViewState extends State<SettingsView> {
                       const Icon(Icons.bolt_rounded, color: Colors.amber, size: 16),
                       const SizedBox(width: 4),
                       Text(
-                        '${_user?.exp ?? 0} EXP',
+                        '${user?.exp ?? 0} EXP',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
