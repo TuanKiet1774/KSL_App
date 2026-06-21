@@ -21,15 +21,14 @@ State management dùng **Provider** (`ChangeNotifier`) — mỗi feature có 1 p
 
 ```
 lib/
-├── model/         # Data models: exam, question, word, user, progress, feedback, learnedWord, favoriteWord
-├── controller/     # Service layer gọi REST API (auth, exam, favorite, feedback, learnedWord, progress, topic, word)
-├── provider/       # ChangeNotifier theo feature, bọc controller + quản lý state (AuthProvider, TopicProvider,
-│                   #   WordProvider, ExamProvider, FavoriteWordProvider, LearnedWordProvider, ProgressProvider, FeedbackProvider)
-├── view/           # Màn hình UI (home, login/register, topic, word, exam, learned, favorite, settings, feedback...)
-├── component/       # Widget tái sử dụng (appColors, avatar, navigation, dialog, loading effect...)
-├── connectDB/        # Tích hợp API: api.dart (backend), imgBB.dart (upload ảnh)
+├── model/         # Data models
+├── controller/     # Service layer gọi REST API 
+├── provider/       # ChangeNotifier 
+├── view/           # Màn hình UI 
+├── component/       # Widget tái sử dụng 
+├── connectDB/        # Tích hợp API
 └── signlanguage/      # Pipeline nhận diện ký hiệu
-    ├── recognition_screen.dart  # Giao diện camera, xử lý frame, hiển thị kết quả
+    ├── recognition_screen.dart  # Giao diện camera
     ├── vsl_classifier.dart       # TFLite inference
     └── skeleton_renderer.dart    # Vẽ pose skeleton
 ```
@@ -67,3 +66,10 @@ Camera frame
 - Khác: `http`, `shared_preferences`, `url_launcher`, `intl`, `path_provider`, `wakelock_plus`
 
 ## Giao diện
+### Ứng dụng KSL
+
+<img width="2000" height="1041" alt="image" src="https://github.com/user-attachments/assets/c90c982f-49f2-4b41-80d0-c37868d09546" />
+
+### Website quản trị
+
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/0d38c8da-96fe-4d91-bbe3-067c222d85d2" />
